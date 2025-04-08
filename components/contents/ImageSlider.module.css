@@ -1,0 +1,209 @@
+/* Slider Container: Centers the slider on the screen with shadow, rounded corners, and gradient background */
+.relative {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  max-height: 360px;
+  margin: auto;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  border-radius: 15px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+}
+
+/* Image Container: Holds images in a flexible layout, manages overflow, and sets height for slider area */
+.imageContainer {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  height: 450px; 
+  border-radius: 15px;
+}
+
+/* Image Wrapper: Creates space for images and animations; sets alignment and transitions */
+.imageWrapper {
+  position: absolute;
+  transition: transform 0.6s linear, opacity 0.6s ease-out;
+
+  display: flex;
+  align-items: center;
+  max-width: 640px;
+  max-height: 360px;
+  border-radius: 15px; 
+  gap: 20px; 
+  overflow: hidden; /* Prevents image overflow beyond rounded corners */
+}
+
+/* Center Image: Sets the main image with full opacity and scale */
+.centerImage {
+  transform: translateX(0);
+  opacity: 1;
+  z-index: 2;
+  transform: scale(1); 
+  filter: brightness(1);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3);
+  transition: transform 0.6s ease, opacity 0.6s ease;
+}
+
+/* Left Image: Places the left image slightly shrunk and dimmed, to the left of the center */
+.leftImage,
+.rightImage {
+  transform: translateX(-100%) scale(0.9); 
+  opacity: 0.6;
+  filter: brightness(0.8);
+  z-index: 1;
+}
+
+/* Right Image: Places the right image slightly shrunk and dimmed, to the right of the center */
+.rightImage {
+  transform: translateX(100%) scale(0.9); 
+  opacity: 0.5;
+  filter: brightness(0.6);
+  z-index: 1;
+}
+
+/* Hidden Image: Fully hides images not in the visible set */
+.hiddenImage {
+  display: none;
+}
+
+/* Navigation Dots: Centers the dots, adds spacing and z-index for visibility */
+.navigationDots {
+  display: flex;
+  justify-content: center;
+  position: absolute; 
+  bottom: 50px; 
+  left: 50%; 
+  transform: translateX(-50%);
+  gap: 12px; 
+  height: 20px;
+  z-index: 10;
+}
+
+/* Dot: Styles each dot with size, shape, and smooth color transition */
+.dot {
+  width: 14px; 
+  height: 14px;
+  border-radius: 50%;
+  background-color: #ddd;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.3s;
+}
+
+/* Active Dot: Highlights the active dot with color and size change */
+.activeDot {
+  background-color: #495057;
+  transform: scale(1.3); 
+}
+
+/* Arrow Buttons: Positioned with background gradient, hover effects, and size for clarity */
+.arrowButtonLeft, .arrowButtonRight {
+  position: absolute;
+  top: 30%;
+  background: linear-gradient(45deg, #343a40, #495057);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  padding: 12px 24px; 
+  font-size: 1.5rem;
+  border-radius: 50%;
+  transition: transform 0.3s, background 0.3s;
+  z-index: 5;
+}
+
+/* Left Arrow: Positioned on the left side with adjusted spacing */
+.arrowButtonLeft {
+  left: 25px; 
+  opacity: 0.5;
+}
+
+/* Right Arrow: Positioned on the right side with adjusted spacing */
+.arrowButtonRight {
+  right: 25px; 
+  opacity: 0.5;
+}
+
+/* Hover Effect for Arrow Buttons: Adds scaling and color effect */
+.arrowButtonLeft:hover, .arrowButtonRight:hover {
+  transform: scale(1.1);
+  background: linear-gradient(45deg, #495057, #343a40);
+}
+
+/* Adjust slider container on small screens */
+@media (max-width: 540px) {
+  .relative {
+    max-width: 100%;
+    max-height: 210px;
+    height: 100%;
+  }
+
+  .imageContainer {
+    display: flex;
+    position: flex;
+    width: 100%;
+    height: 210px;
+  }
+
+  /* Image Wrapper: Creates space for images and animations; sets alignment and transitions */
+  .imageWrapper {
+    position: absolute;
+    transition: transform 0.6s ease-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%; /* Full width of the container */
+    height: 100%; /* Full height of the container */
+    border-radius: 15px;
+    gap: 20; /* No gap between images */
+    overflow: hidden; /* Prevents image overflow beyond rounded corners */
+    opacity: 0;
+  }
+
+  /* Center Image: Sets the main image with full opacity */
+  .centerImage {
+    transform: translateX(0); /* In the center */
+    opacity: 1;
+    z-index: 2;
+  }
+
+  /* Left Image: Places the left image to the left of the center */
+  .leftImage {
+    transform: translateX(-105%); /* Move it to the left */
+    opacity: 1;
+    z-index: 1;
+    filter: brightness(0.6);
+  }
+
+  /* Right Image: Places the right image to the right of the center */
+  .rightImage {
+    transform: translateX(105%); /* Move it to the right */
+    opacity: 1;
+    z-index: 1;
+    filter: brightness(0.6);
+  }
+
+  /* Hidden Image: Fully hides images not in the visible set */
+  .hiddenImage {
+    display: none;
+  }
+
+  .navigationDots {
+    position: absolute;
+    display: flex;
+    justify-content: center;
+    top: 94%;
+    gap: 8px;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+  }
+
+  .arrowButtonLeft, .arrowButtonRight {
+    top: 40%;
+    padding: 8px 16px;
+    font-size: 1.2rem;
+  }
+}

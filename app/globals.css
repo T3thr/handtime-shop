@@ -1,0 +1,215 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base theme configuration */
+:root {
+  /* Core colors */
+  --background: #ffffff;
+  --foreground: #0f172a; /* Slate-900 for better readability */
+  --background-secondary: #f8fafc; /* Slate-50 */
+  --container: #f0f4f8;
+
+  /* Brand colors */
+  --primary: #0f766e; /* Teal-700: Professional & trustworthy for e-commerce */
+  --primary-light: #14b8a6; /* Teal-500 */
+  --primary-dark: #0d9488; /* Teal-600 */
+  --secondary: #f8fafc; /* Slate-50 */
+
+  /* UI Elements */
+  --surface-card: #ffffff;
+  --surface-dropdown: #ffffff;
+  --surface-tooltip: #27272a;
+  
+  /* Text colors */
+  --text-primary: #0f172a; /* Slate-900 */
+  --text-secondary: #475569; /* Slate-600 */
+  --text-muted: #64748b; /* Slate-500 */
+  --text-inverted: #ffffff;
+
+  /* Interactive states */
+  --interactive-primary: #0f766e; /* Teal-700 */
+  --interactive-hover: #0d9488; /* Teal-600 */
+  --interactive-muted: #f1f5f9; /* Slate-100 */
+  
+  /* Feedback colors */
+  --success: #059669; /* Emerald-600 */
+  --error: #dc2626; /* Red-600 */
+  --warning: #d97706; /* Amber-600 */
+  --info: #0284c7; /* Sky-600 */
+
+  /* Borders & Dividers */
+  --border-primary: #85888d; /* Slate-200 */
+  --border-secondary: #f1f5f9; /* Slate-100 */
+  
+  /* System */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+}
+
+/* Dark theme configuration */
+:root.dark {
+  /* Core colors */
+  --background: #0f172a; /* Slate-900 */
+  --foreground: #f8fafc; /* Slate-50 */
+  --background-secondary: #1e293b; /* Slate-800 */
+  --container: #2a2a2a;
+
+  /* Brand colors remain consistent for brand recognition */
+  --primary: #14b8a6; /* Teal-500: Brighter for dark mode */
+  --primary-light: #2dd4bf; /* Teal-400 */
+  --primary-dark: #0d9488; /* Teal-600 */
+  
+  /* UI Elements */
+  --surface-card: #1e293b; /* Slate-800 */
+  --surface-dropdown: #1e293b;
+  --surface-tooltip: #f8fafc;
+
+  /* Text colors */
+  --text-primary: #f8fafc; /* Slate-50 */
+  --text-secondary: #cbd5e1; /* Slate-300 */
+  --text-muted: #94a3b8; /* Slate-400 */
+  
+  /* Borders & Dividers */
+  --border-primary: #334155; /* Slate-700 */
+  --border-secondary: #1e293b; /* Slate-800 */
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Base styles */
+body {
+  color: var(--text-primary);
+  background: var(--background);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Component utility classes */
+.nav-link {
+  @apply transition-colors duration-200;
+  color: var(--text-secondary);
+}
+
+.nav-link:hover {
+  color: var(--primary);
+}
+
+.btn-primary {
+  @apply px-4 py-2 rounded transition-all duration-200;
+  background: var(--primary);
+  color: var(--text-inverted);
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+}
+
+/* Animation utilities */
+.fade-in {
+  @apply animate-[fadeIn_0.3s_ease-in-out];
+}
+
+.slide-up {
+  @apply animate-[slideUp_0.3s_ease-in-out];
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Dark mode overrides */
+.dark {
+  color-scheme: dark;
+}
+
+/* Optimized input styles */
+.input-field {
+  @apply block w-full pl-10 pr-3 py-2.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-gray-900 dark:text-white;
+}
+
+/* Additional animations for the StartGuide component */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slideUp {
+  animation: slideUp 0.4s ease-out;
+}
+
+/* use a subtle pulse animation for the menu icon */
+@keyframes softPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.pulse-soft {
+  animation: softPulse 2s infinite ease-in-out;
+}
+
+/* Highlight style for search keywords with smooth ease-in-out animation */
+.highlight {
+  background-color: #edd600; /* Yellow highlight */
+  opacity: 1; /* Initially invisible */
+  transition: background-color 0.4s ease-in-out, opacity 0.4s ease-in-out; /* Smooth transition for background-color and opacity */
+}
+
+/* Show highlight with opacity */
+.highlight.visible {
+  opacity: 0; /* Make the highlighted color on text text visible */
+}
