@@ -7,7 +7,7 @@ export async function POST(request) {
   try {
     await dbConnect();
 
-    const { userId, displayName, pictureUrl, idToken } = await request.json();
+    const { userId, displayName, pictureUrl } = await request.json();
 
     if (!userId) {
       return NextResponse.json({ error: "LINE user ID is required" }, { status: 400 });
@@ -19,14 +19,14 @@ export async function POST(request) {
       user = new User({
         lineId: userId,
         name: displayName || `LINE User ${userId.slice(0, 4)}`,
-        avatar: pictureUrl && /^(https?:\/\/).+/.test(pictureUrl) ? pictureUrl : null, // Validate URL or set null
+        avatar: pictureUrl && /^(https?:\/\/).+/.test(pictureUrl) ? pictureUrl : null,
         role: "user",
         email: null,
         username: null,
         password: null,
         cart: [],
         wishlist: [],
-        orders: [], // Empty array, orderId defaults will apply when orders are added
+        orders: [],
         addresses: [],
         isVerified: true,
         lastLogin: new Date(),
@@ -41,6 +41,7 @@ export async function POST(request) {
         },
       });
       await user.save();
+      console.log(`Registered new LINE user: ${user.lineId}`);
     } else {
       user.lastLogin = new Date();
       if (!user.avatar && pictureUrl && /^(https?:\/\/).+/.test(pictureUrl)) {
@@ -50,6 +51,7 @@ export async function POST(request) {
         user.name = displayName;
       }
       await user.save();
+      console.log(`Updated existing LINE user: ${user.lineId}`);
     }
 
     return NextResponse.json({

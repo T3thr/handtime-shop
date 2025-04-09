@@ -31,8 +31,10 @@ export const AuthProvider = ({ children }) => {
           const profile = await liff.getProfile();
           setLineProfile(profile);
           if (status === "unauthenticated") {
-            await registerLineUser(profile);
-            await lineSignIn(profile);
+            const result = await lineSignIn(profile);
+            if (!result.success) {
+              console.error("Initial LINE sign-in failed:", result.message);
+            }
           }
         }
       } catch (error) {
@@ -68,7 +70,6 @@ export const AuthProvider = ({ children }) => {
         userId: profile.userId,
         displayName: profile.displayName,
         pictureUrl: profile.pictureUrl,
-        idToken: profile.idToken || null,
       });
 
       if (res.data.success) {
@@ -159,8 +160,7 @@ export const AuthProvider = ({ children }) => {
       });
 
       if (res?.error) {
-        toast.error(res.error);
-        return { success: false, message: res.error };
+        throw new Error(res.error);
       }
 
       if (res?.ok) {
@@ -172,7 +172,7 @@ export const AuthProvider = ({ children }) => {
       return { success: false, message: "Unknown error occurred" };
     } catch (error) {
       console.error("LINE signin error:", error);
-      toast.error("LINE signin failed");
+      toast.error(error.message || "LINE signin failed");
       return { success: false, message: error.message || "LINE signin failed" };
     } finally {
       setLoading(false);

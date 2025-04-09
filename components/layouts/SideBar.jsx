@@ -1,3 +1,4 @@
+// components/layouts/SideBar.jsx
 "use client";
 import React, { useState, useCallback, useContext, useEffect } from "react";
 import Link from "next/link";
@@ -27,17 +28,16 @@ export default function SideBar() {
   const [isLineLoading, setIsLineLoading] = useState(false);
   const [showUserId, setShowUserId] = useState(false);
   const [showSigninGuide, setShowSigninGuide] = useState(false);
-  const [highlightedLink, setHighlightedLink] = useState(""); // State to track highlighted link
+  const [highlightedLink, setHighlightedLink] = useState("");
 
   const { user, lineProfile, lineSignIn, adminSignIn, logoutUser, status } = useContext(AuthContext);
 
-  // Handle search integration with sidebar
   useEffect(() => {
     const handleOpenSidebar = (e) => {
       const { href, keyword } = e.detail;
-      openSidebar(); // Open the sidebar
-      setHighlightedLink(href); // Set the link to highlight
-      setTimeout(() => setHighlightedLink(""), 3000); // Clear highlight after 3 seconds
+      openSidebar();
+      setHighlightedLink(href);
+      setTimeout(() => setHighlightedLink(""), 3000);
     };
     document.addEventListener("openSidebar", handleOpenSidebar);
     return () => document.removeEventListener("openSidebar", handleOpenSidebar);
@@ -47,12 +47,16 @@ export default function SideBar() {
     setIsLineLoading(true);
     try {
       const { default: liff } = await import("@line/liff");
-      if (!liff._liffId) {
+      if (!process.env.NEXT_PUBLIC_LIFF_ID) {
+        throw new Error("LIFF ID is not configured");
+      }
+
+      if (!liff.isInited) {
         await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
       }
 
       if (!liff.isLoggedIn()) {
-        liff.login();
+        liff.login({ redirectUri: window.location.href });
         return;
       }
 
@@ -65,9 +69,7 @@ export default function SideBar() {
       closeSidebar();
     } catch (error) {
       console.error("LINE login error:", error);
-      if (!error.message?.includes("redirect")) {
-        toast.error("LINE login failed. Please try again.");
-      }
+      toast.error(error.message || "LINE login failed. Please try again.");
     } finally {
       setIsLineLoading(false);
     }
@@ -220,7 +222,7 @@ export default function SideBar() {
                     </div>
                     <button
                       onClick={closeSidebar}
-                      className="p-2 hover:bg-container rounded-full flex-shrink-0"
+                      className="p-2 hover:bg-container rounded-full flexed-shrink-0"
                       aria-label="Close menu"
                     >
                       <X className="h-5 w-5 text-foreground" />
@@ -231,7 +233,7 @@ export default function SideBar() {
                 <div className="flex-1 overflow-y-auto py-4">
                   <div className="space-y-1 px-3">
                     {sidebarContent
-                      .filter((item) => item.href !== "/account") // Exclude "Account Settings" from static list
+                      .filter((item) => item.href !== "/account")
                       .map(({ href, icon: Icon, name }) => (
                         <Link
                           key={href}
@@ -249,7 +251,6 @@ export default function SideBar() {
                           <ChevronRight className="h-4 w-4 text-text-tertiary group-hover:text-primary" />
                         </Link>
                       ))}
-                    {/* Conditionally render Account Settings */}
                     {isAuthenticated ? (
                       <Link
                         href="/account"
