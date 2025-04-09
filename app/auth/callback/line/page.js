@@ -1,15 +1,31 @@
 // app/auth/callback/line/page.js
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { toast } from "react-toastify";
 
 export default function LineCallback() {
   const router = useRouter();
+  const { data: session, status } = useSession();
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     const handleCallback = async () => {
+      // If user is already authenticated, redirect to homepage immediately
+      if (status === "authenticated") {
+        router.replace("/");
+        return;
+      }
+
+      // If user is not authenticated and not in the process of logging in, redirect to home
+      if (status === "unauthenticated" && !isProcessing && !document.referrer.includes("line.me")) {
+        router.replace("/");
+        return;
+      }
+
+      setIsProcessing(true);
+
       try {
         const { default: liff } = await import("@line/liff");
         if (!liff.isLoggedIn()) {
@@ -27,19 +43,21 @@ export default function LineCallback() {
 
         if (res?.ok) {
           toast.success("LINE login successful!");
-          router.push("/"); // Redirect to homepage or intended page
+          router.replace("/"); // Redirect to homepage after successful login
         } else {
           throw new Error(res?.error || "Authentication failed");
         }
       } catch (error) {
         console.error("LINE callback error:", error);
         toast.error(error.message || "Failed to complete LINE login");
-        router.push("/");
+        router.replace("/auth/signin"); // Redirect to sign-in page on failure
+      } finally {
+        setIsProcessing(false);
       }
     };
 
     handleCallback();
-  }, [router]);
+  }, [router, status, isProcessing]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">
