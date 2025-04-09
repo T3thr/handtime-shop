@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
-import { FaEdit, FaTrash, FaSearch, FaSort, FaSortUp, FaSortDown, FaTag, FaChevronDown, FaChevronUp } from "react-icons/fa";
+import { FaEdit, FaTrash, FaSearch, FaSort, FaSortUp, FaSortDown, FaTag, FaChevronDown, FaChevronUp, FaStar } from "react-icons/fa";
 import { 
   Card, 
   DataTable, 
@@ -20,7 +20,55 @@ import { toast } from "react-toastify";
 // Category Management Component
 export const CategoryManagement = ({ onAddCategory, onEditCategory, onDeleteCategory }) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [sortField, setSortField] = useState("name");
+  const [sortDirection, setSortDirection] = useState("asc");
   const { categories, isLoading, isError } = useCategories();
+  
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+  
+  const getSortIcon = (field) => {
+    if (sortField !== field) return <FaSort className="ml-1 text-text-muted" />;
+    return sortDirection === "asc" ? (
+      <FaSortUp className="ml-1 text-primary" />
+    ) : (
+      <FaSortDown className="ml-1 text-primary" />
+    );
+  };
+  
+  const sortedAndFilteredCategories = useMemo(() => {
+    if (!categories) return [];
+    
+    return [...categories]
+      .filter(category => 
+        category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        category.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .sort((a, b) => {
+        if (sortField === 'priority') {
+          // Sort by priority (main first, then normal)
+          const priorityOrder = { main: 0, normal: 1 };
+          const aValue = priorityOrder[a.priority || 'normal'];
+          const bValue = priorityOrder[b.priority || 'normal'];
+          return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+        }
+        
+        if (!a[sortField] || !b[sortField]) return 0;
+        
+        const aValue = typeof a[sortField] === "string" ? a[sortField].toLowerCase() : a[sortField];
+        const bValue = typeof b[sortField] === "string" ? b[sortField].toLowerCase() : b[sortField];
+        
+        if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+        if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+        return 0;
+      });
+  }, [categories, searchTerm, sortField, sortDirection]);
   
   if (isLoading) {
     return (
@@ -44,41 +92,76 @@ export const CategoryManagement = ({ onAddCategory, onEditCategory, onDeleteCate
     );
   }
   
-  const filteredCategories = categories?.filter(
-    (category) => category.name.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
-  
   const columns = [
     { 
-      header: "Name", 
+      header: (
+        <div className="flex items-center cursor-pointer" onClick={() => handleSort("name")}>
+          Name {getSortIcon("name")}
+        </div>
+      ),
       accessor: "name", 
       render: (row) => (
         <div className="flex items-center">
-          {row.image ? (
+          {row.image && row.image.url ? (
             <div className="w-10 h-10 mr-3 rounded-md overflow-hidden bg-background-secondary">
-              <Image src={row.image} alt={row.name} width={40} height={40} className="object-cover" />
+              <Image 
+                src={row.image.url} 
+                alt={row.name} 
+                width={40} 
+                height={40} 
+                className="object-cover" 
+                unoptimized // For Cloudinary URLs
+              />
             </div>
           ) : (
             <div className="w-10 h-10 mr-3 rounded-md bg-background-secondary flex items-center justify-center">
               <FaTag className="text-text-muted" />
             </div>
           )}
-          <span className="font-medium text-text-primary">{row.name}</span>
+          <div className="flex items-center">
+            <span className="font-medium text-text-primary">{row.name}</span>
+            {row.priority === "main" && (
+              <FaStar className="ml-2 text-warning" title="Main category (featured on homepage)" />
+            )}
+          </div>
         </div>
       )
     },
     { 
-      header: "Slug", 
+      header: (
+        <div className="flex items-center cursor-pointer" onClick={() => handleSort("slug")}>
+          Slug {getSortIcon("slug")}
+        </div>
+      ),
       accessor: "slug",
       render: (row) => <span className="text-text-muted">{row.slug}</span>
     },
     { 
-      header: "Description", 
+      header: (
+        <div className="flex items-center cursor-pointer" onClick={() => handleSort("description")}>
+          Description {getSortIcon("description")}
+        </div>
+      ),
       accessor: "description",
       render: (row) => (
         <span className="text-text-secondary line-clamp-1">
           {row.description || "No description"}
         </span>
+      )
+    },
+    { 
+      header: (
+        <div className="flex items-center cursor-pointer" onClick={() => handleSort("priority")}>
+          Priority {getSortIcon("priority")}
+        </div>
+      ),
+      accessor: "priority",
+      render: (row) => (
+        <Badge 
+          color={row.priority === "main" ? "warning" : "primary"}
+        >
+          {row.priority === "main" ? "Main" : "Normal"}
+        </Badge>
       )
     },
     { 
@@ -136,7 +219,7 @@ export const CategoryManagement = ({ onAddCategory, onEditCategory, onDeleteCate
       
       <DataTable 
         columns={columns} 
-        data={filteredCategories} 
+        data={sortedAndFilteredCategories} 
         emptyMessage="No categories found."
       />
     </Card>
@@ -185,21 +268,25 @@ export const ManageStore = ({
   };
   
   // Filter and sort products
-  const filteredProducts = products
-    ?.filter((product) => 
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (!a[sortField] || !b[sortField]) return 0;
-      
-      const aValue = typeof a[sortField] === "string" ? a[sortField].toLowerCase() : a[sortField];
-      const bValue = typeof b[sortField] === "string" ? b[sortField].toLowerCase() : b[sortField];
-      
-      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
-      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
-      return 0;
-    }) || [];
+  const sortedAndFilteredProducts = useMemo(() => {
+    if (!products) return [];
+    
+    return [...products]
+      .filter((product) => 
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .sort((a, b) => {
+        if (!a[sortField] || !b[sortField]) return 0;
+        
+        const aValue = typeof a[sortField] === "string" ? a[sortField].toLowerCase() : a[sortField];
+        const bValue = typeof b[sortField] === "string" ? b[sortField].toLowerCase() : b[sortField];
+        
+        if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+        if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+        return 0;
+      });
+  }, [products, searchTerm, sortField, sortDirection]);
   
   const handlePageChange = useCallback((page) => {
     setCurrentPage(page);
@@ -224,6 +311,7 @@ export const ManageStore = ({
                 width={48} 
                 height={48} 
                 className="object-cover" 
+                unoptimized // For Cloudinary URLs
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -341,23 +429,25 @@ export const ManageStore = ({
     <div>
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
         <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
-        <div className="relative mt-4 md:mt-0">
-          <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted" />
-          <input
-            type="text"
-            placeholder={`Search ${activeTab}...`}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 pr-4 py-2 w-full md:w-64 bg-background rounded-lg border border-border-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
+        <div className="mt-4 md:mt-0">
         </div>
       </div>
       
       {activeTab === "products" && (
         <>
+          <div className="flex justify-end mb-4">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => onEditProduct(null)}
+              className="px-4 py-2 bg-primary text-text-inverted rounded-lg hover:bg-primary-dark transition-colors duration-300 shadow-md"
+            >
+              Add Product
+            </motion.button>
+          </div>
           <DataTable 
             columns={productColumns} 
-            data={filteredProducts} 
+            data={sortedAndFilteredProducts} 
             emptyMessage="No products found."
           />
           <Pagination 
@@ -370,7 +460,6 @@ export const ManageStore = ({
       
       {activeTab === "categories" && (
         <CategoryManagement 
-          categories={categories}
           onAddCategory={onAddCategory}
           onEditCategory={onEditCategory}
           onDeleteCategory={onDeleteCategory}
@@ -383,13 +472,65 @@ export const ManageStore = ({
 // User Management Component
 export const UserManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [sortField, setSortField] = useState("name");
+  const [sortDirection, setSortDirection] = useState("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const { users, isLoading, isError, pagination, changePage } = useUsers(currentPage, 10);
+  
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+  
+  const getSortIcon = (field) => {
+    if (sortField !== field) return <FaSort className="ml-1 text-text-muted" />;
+    return sortDirection === "asc" ? (
+      <FaSortUp className="ml-1 text-primary" />
+    ) : (
+      <FaSortDown className="ml-1 text-primary" />
+    );
+  };
   
   const handlePageChange = useCallback((page) => {
     setCurrentPage(page);
     changePage(page);
   }, [changePage]);
+  
+  const sortedAndFilteredUsers = useMemo(() => {
+    if (!users) return [];
+    
+    return [...users]
+      .filter((user) => 
+        user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.username?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .sort((a, b) => {
+        if (!a[sortField] || !b[sortField]) return 0;
+        
+        // Handle nested fields like stats.totalOrders
+        if (sortField.includes('.')) {
+          const [parent, child] = sortField.split('.');
+          const aValue = a[parent] && a[parent][child] ? a[parent][child] : 0;
+          const bValue = b[parent] && b[parent][child] ? b[parent][child] : 0;
+          
+          if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+          if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+          return 0;
+        }
+        
+        const aValue = typeof a[sortField] === "string" ? a[sortField].toLowerCase() : a[sortField];
+        const bValue = typeof b[sortField] === "string" ? b[sortField].toLowerCase() : b[sortField];
+        
+        if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+        if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+        return 0;
+      });
+  }, [users, searchTerm, sortField, sortDirection]);
   
   if (isLoading) {
     return (
@@ -413,16 +554,13 @@ export const UserManagement = () => {
     );
   }
   
-  const filteredUsers = users
-    ?.filter((user) => 
-      user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.username?.toLowerCase().includes(searchTerm.toLowerCase())
-    ) || [];
-  
   const columns = [
     { 
-      header: "User",
+      header: (
+        <div className="flex items-center cursor-pointer" onClick={() => handleSort("name")}>
+          User {getSortIcon("name")}
+        </div>
+      ),
       accessor: "name", 
       render: (row) => (
         <div className="flex items-center">
@@ -439,7 +577,11 @@ export const UserManagement = () => {
       )
     },
     { 
-      header: "Role",
+      header: (
+        <div className="flex items-center cursor-pointer" onClick={() => handleSort("role")}>
+          Role {getSortIcon("role")}
+        </div>
+      ),
       accessor: "role",
       render: (row) => (
         <Badge 
@@ -450,7 +592,11 @@ export const UserManagement = () => {
       )
     },
     { 
-      header: "Status",
+      header: (
+        <div className="flex items-center cursor-pointer" onClick={() => handleSort("isVerified")}>
+          Status {getSortIcon("isVerified")}
+        </div>
+      ),
       accessor: "isVerified",
       render: (row) => (
         <Badge color={row.isVerified ? "success" : "warning"}>
@@ -459,7 +605,11 @@ export const UserManagement = () => {
       )
     },
     { 
-      header: "Orders",
+      header: (
+        <div className="flex items-center cursor-pointer" onClick={() => handleSort("stats.totalOrders")}>
+          Orders {getSortIcon("stats.totalOrders")}
+        </div>
+      ),
       accessor: "stats.totalOrders",
       render: (row) => (
         <span className="font-medium text-text-primary">
@@ -468,7 +618,11 @@ export const UserManagement = () => {
       )
     },
     { 
-      header: "Spent",
+      header: (
+        <div className="flex items-center cursor-pointer" onClick={() => handleSort("stats.totalSpent")}>
+          Spent {getSortIcon("stats.totalSpent")}
+        </div>
+      ),
       accessor: "stats.totalSpent",
       align: "right",
       render: (row) => (
@@ -497,7 +651,7 @@ export const UserManagement = () => {
       
       <DataTable 
         columns={columns} 
-        data={filteredUsers} 
+        data={sortedAndFilteredUsers} 
         emptyMessage="No users found."
       />
       
@@ -506,165 +660,6 @@ export const UserManagement = () => {
         totalPages={pagination.totalPages}
         onPageChange={handlePageChange}
       />
-    </div>
-  );
-};
-
-// Order Management Component
-export const OrderManagement = () => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const { orders, isLoading, isError, pagination, changePage } = useAllOrders(currentPage, 10, statusFilter);
-  
-  const handlePageChange = useCallback((page) => {
-    setCurrentPage(page);
-    changePage(page);
-  }, [changePage]);
-  
-  const statusOptions = [
-    { value: "all", label: "All Orders" },
-    { value: "pending", label: "Pending" },
-    { value: "processing", label: "Processing" },
-    { value: "shipped", label: "Shipped" },
-    { value: "delivered", label: "Delivered" },
-    { value: "cancelled", label: "Cancelled" },
-  ];
-  
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-  
-  if (isError) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-error mb-4">Failed to load orders</p>
-        <button 
-          onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-primary text-text-inverted rounded-lg hover:bg-primary-dark transition-colors duration-300"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-  
-  const filteredOrders = orders
-    ?.filter((order) => 
-      order.orderId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.userName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.userEmail?.toLowerCase().includes(searchTerm.toLowerCase())
-    ) || [];
-  
-  const columns = [
-    { 
-      header: "Order ID",
-      accessor: "orderId", 
-      render: (row) => (
-        <span className="font-medium text-primary">{row.orderId}</span>
-      )
-    },
-    { 
-      header: "Date",
-      accessor: "createdAt",
-      render: (row) => (
-        <div>
-          <div>{new Date(row.createdAt).toLocaleDateString()}</div>
-          <div className="text-xs text-text-muted">
-            {new Date(row.createdAt).toLocaleTimeString()}
-          </div>
-        </div>
-      )
-    },
-    { 
-      header: "Customer",
-      accessor: "userName",
-      render: (row) => (
-        <span className="text-text-primary">{row.userName || "Unknown"}</span>
-      )
-    },
-    { 
-      header: "Status",
-      accessor: "status",
-      render: (row) => (
-        <Badge 
-          color={
-            row.status === "pending" ? "warning" : 
-            row.status === "processing" ? "info" : 
-            row.status === "shipped" ? "primary" : 
-            row.status === "delivered" ? "success" : 
-            "error"
-          }
-        >
-          {row.status}
-        </Badge>
-      )
-    },
-    { 
-      header: "Total",
-      accessor: "totalAmount",
-      align: "right",
-      render: (row) => (
-        <span className="font-medium text-text-primary">
-          ฿{row.totalAmount.toFixed(2)}
-        </span>
-      )
-    },
-  ];
-  
-  return (
-    <div>
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-        <div className="flex items-center space-x-4 mb-4 md:mb-0">
-          <h3 className="text-lg font-medium text-text-primary">Order Management</h3>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-background rounded-lg border border-border-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
-          >
-            {statusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="relative">
-          <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted" />
-          <input
-            type="text"
-            placeholder="Search orders..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 pr-4 py-2 w-full md:w-64 bg-background rounded-lg border border-border-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
-        </div>
-      </div>
-      
-      {filteredOrders.length > 0 ? (
-        <>
-          <DataTable 
-            columns={columns} 
-            data={filteredOrders} 
-            emptyMessage="No orders found."
-          />
-          
-          <Pagination 
-            currentPage={pagination.page}
-            totalPages={pagination.totalPages}
-            onPageChange={handlePageChange}
-          />
-        </>
-      ) : (
-        <EmptyState 
-          title="No Orders Found"
-          description={`No ${statusFilter !== 'all' ? statusFilter : ''} orders match your search criteria.`}
-        />
-      )}
     </div>
   );
 };

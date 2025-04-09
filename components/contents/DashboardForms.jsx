@@ -1,23 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
-import { 
-  FaTimes, 
-  FaUpload, 
-  FaTrash, 
-  FaPlus, 
-  FaCheck, 
-  FaExclamationTriangle,
-  FaTag,
-  FaBoxOpen
-} from "react-icons/fa";
+import { FaTimes, FaUpload, FaTrash, FaPlus, FaCheck, FaExclamationTriangle, FaTag, FaBoxOpen, FaStar } from "react-icons/fa";
 import { addProduct, updateProduct, addCategory, updateCategory } from "@/backend/lib/dashboardAction";
 
-// Product Form Modal
 export const ProductFormModal = ({ isOpen, onClose, product = null, categories = [] }) => {
   const [formData, setFormData] = useState({
     name: "",
@@ -36,24 +26,27 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
     categories: [],
     tags: [],
     status: "active",
-    images: [],
+    images: [], // Array of { url, public_id } objects from Cloudinary
     seoTitle: "",
     seoDescription: "",
     shortDescription: "",
     type: "",
     vendor: ""
   });
-  
+
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [imageFiles, setImageFiles] = useState([]);
-  const [imagePreviewUrls, setImagePreviewUrls] = useState([]);
+  const [imageFiles, setImageFiles] = useState([]); // Files to upload
+  const [imagePreviewUrls, setImagePreviewUrls] = useState([]); // URLs for preview
   const [newTag, setNewTag] = useState("");
-  
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const initialFormDataRef = useRef(null);
+  const modalRef = useRef(null);
+
   // Initialize form with product data if editing
   useEffect(() => {
     if (product) {
-      setFormData({
+      const initialData = {
         name: product.name || "",
         slug: product.slug || "",
         description: product.description || "",
@@ -76,15 +69,51 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
         shortDescription: product.shortDescription || "",
         type: product.type || "",
         vendor: product.vendor || ""
-      });
+      };
       
-      // Set image previews for existing images
+      setFormData(initialData);
+      initialFormDataRef.current = JSON.stringify(initialData);
+
+      // Set image previews for existing Cloudinary images
       if (product.images && product.images.length > 0) {
         setImagePreviewUrls(product.images.map(img => img.url));
       }
+    } else {
+      // Reset form for new product
+      const initialData = {
+        name: "",
+        slug: "",
+        description: "",
+        price: "",
+        compareAtPrice: "",
+        costPerItem: "",
+        trackQuantity: true,
+        quantity: "0",
+        continueSellingWhenOutOfStock: false,
+        sku: "",
+        barcode: "",
+        weight: "",
+        weightUnit: "g",
+        categories: [],
+        tags: [],
+        status: "active",
+        images: [],
+        seoTitle: "",
+        seoDescription: "",
+        shortDescription: "",
+        type: "",
+        vendor: ""
+      };
+      
+      setFormData(initialData);
+      initialFormDataRef.current = JSON.stringify(initialData);
+      setImageFiles([]);
+      setImagePreviewUrls([]);
     }
-  }, [product]);
-  
+    
+    setHasUnsavedChanges(false);
+  }, [product, isOpen]);
+
   // Generate slug from name
   useEffect(() => {
     if (!product && formData.name && !formData.slug) {
@@ -92,28 +121,31 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
         .toLowerCase()
         .replace(/[^\w\s-]/g, '')
         .replace(/\s+/g, '-');
-      
       setFormData(prev => ({ ...prev, slug }));
     }
   }, [formData.name, product]);
-  
+
+  // Check for unsaved changes
+  useEffect(() => {
+    if (initialFormDataRef.current) {
+      const currentFormData = JSON.stringify(formData);
+      setHasUnsavedChanges(currentFormData !== initialFormDataRef.current);
+    }
+  }, [formData]);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
-    
-    // Clear error when field is edited
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: null }));
     }
   };
-  
+
   const handleCategoryChange = (e) => {
     const { value, checked } = e.target;
-    
     setFormData(prev => ({
       ...prev,
       categories: checked
@@ -121,7 +153,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
         : prev.categories.filter(cat => cat !== value)
     }));
   };
-  
+
   const handleAddTag = () => {
     if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
       setFormData(prev => ({
@@ -131,59 +163,94 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
       setNewTag("");
     }
   };
-  
+
   const handleRemoveTag = (tag) => {
     setFormData(prev => ({
       ...prev,
       tags: prev.tags.filter(t => t !== tag)
     }));
   };
-  
-  const handleImageChange = (e) => {
+
+  const uploadImageToCloudinary = async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to upload image");
+      }
+
+      const data = await response.json();
+      return { url: data.url, public_id: data.public_id };
+    } catch (error) {
+      console.error("Image upload error:", error);
+      toast.error(`Failed to upload image: ${error.message}`);
+      throw error;
+    }
+  };
+
+  const handleImageChange = async (e) => {
     const files = Array.from(e.target.files);
-    
     if (files.length === 0) return;
-    
-    // Preview images
+
     const newImageFiles = [...imageFiles, ...files];
     setImageFiles(newImageFiles);
-    
+
     const newPreviewUrls = [...imagePreviewUrls];
-    
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        newPreviewUrls.push(reader.result);
-        setImagePreviewUrls([...newPreviewUrls]);
-      };
-      reader.readAsDataURL(file);
-    });
+    const newImages = [...formData.images];
+
+    for (const file of files) {
+      try {
+        // Generate preview URL immediately
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          newPreviewUrls.push(reader.result);
+          setImagePreviewUrls([...newPreviewUrls]);
+        };
+        reader.readAsDataURL(file);
+
+        // Upload to Cloudinary
+        const uploadedImage = await uploadImageToCloudinary(file);
+        newImages.push(uploadedImage);
+        setFormData(prev => ({ ...prev, images: newImages }));
+      } catch (error) {
+        // Error is already toasted in uploadImageToCloudinary
+        continue;
+      }
+    }
   };
-  
+
   const handleRemoveImage = (index) => {
-    // If it's an existing image from the product
-    if (index < formData.images.length) {
-      const newImages = [...formData.images];
+    const newImages = [...formData.images];
+    const newPreviewUrls = [...imagePreviewUrls];
+    const newImageFiles = [...imageFiles];
+
+    if (index < newImages.length) {
+      // Remove existing Cloudinary image
       newImages.splice(index, 1);
       setFormData(prev => ({ ...prev, images: newImages }));
     }
-    
-    // Remove from preview
-    const newPreviewUrls = [...imagePreviewUrls];
+
+    // Remove from previews
     newPreviewUrls.splice(index, 1);
     setImagePreviewUrls(newPreviewUrls);
-    
-    // Remove from files if it's a new image
-    if (index >= formData.images.length) {
-      const newImageFiles = [...imageFiles];
-      newImageFiles.splice(index - formData.images.length, 1);
+
+    // Adjust imageFiles if it's a new upload
+    if (index >= formData.images.length && newImageFiles.length > 0) {
+      const fileIndex = index - formData.images.length;
+      newImageFiles.splice(fileIndex, 1);
       setImageFiles(newImageFiles);
     }
   };
-  
+
   const validateForm = () => {
     const newErrors = {};
-    
     if (!formData.name.trim()) newErrors.name = "Name is required";
     if (!formData.slug.trim()) newErrors.slug = "Slug is required";
     if (!formData.price.trim()) newErrors.price = "Price is required";
@@ -200,43 +267,36 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
     if (formData.weight && isNaN(parseFloat(formData.weight))) {
       newErrors.weight = "Weight must be a number";
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!validateForm()) return;
-    
+
     setIsSubmitting(true);
-    
+
     try {
-      // Prepare data for submission
       const productData = {
         ...formData,
         price: parseFloat(formData.price),
         compareAtPrice: formData.compareAtPrice ? parseFloat(formData.compareAtPrice) : null,
         costPerItem: formData.costPerItem ? parseFloat(formData.costPerItem) : null,
         quantity: formData.trackQuantity ? parseInt(formData.quantity) : null,
-        weight: formData.weight ? parseFloat(formData.weight) : null
+        weight: formData.weight ? parseFloat(formData.weight) : null,
       };
-      
-      // Handle image uploads here if needed
-      // This would typically involve uploading to a service like Cloudinary
-      // and then adding the URLs to productData.images
-      
+
       if (product) {
-        // Update existing product
         await updateProduct(product._id, productData);
         toast.success("Product updated successfully!");
       } else {
-        // Add new product
         await addProduct(productData);
         toast.success("Product added successfully!");
       }
-      
+
+      setHasUnsavedChanges(false);
       onClose();
     } catch (error) {
       console.error("Error saving product:", error);
@@ -245,22 +305,30 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
       setIsSubmitting(false);
     }
   };
-  
-  // Animation variants
+
+  const handleClose = () => {
+    if (hasUnsavedChanges) {
+      // Auto-save to localStorage
+      localStorage.setItem('productFormAutoSave', JSON.stringify(formData));
+      toast.info("Your changes have been auto-saved. They will be restored when you return.");
+    }
+    onClose();
+  };
+
   const modalVariants = {
     hidden: { opacity: 0, y: 50 },
     visible: { opacity: 1, y: 0, transition: { type: "spring", damping: 25, stiffness: 500 } },
     exit: { opacity: 0, y: 50, transition: { duration: 0.2 } }
   };
-  
+
   const backdropVariants = {
     hidden: { opacity: 0 },
     visible: { opacity: 1 },
     exit: { opacity: 0 }
   };
-  
+
   if (!isOpen) return null;
-  
+
   return (
     <AnimatePresence>
       <motion.div
@@ -269,15 +337,15 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
         initial="hidden"
         animate="visible"
         exit="exit"
-        onClick={onClose}
       >
         <motion.div
+          ref={modalRef}
           className="bg-surface-card rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
           variants={modalVariants}
           initial="hidden"
           animate="visible"
           exit="exit"
-          onClick={e => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         >
           <div className="flex justify-between items-center p-6 border-b border-border-primary">
             <h2 className="text-xl font-semibold text-text-primary">
@@ -286,13 +354,13 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              onClick={onClose}
+              onClick={handleClose}
               className="p-2 rounded-full hover:bg-background-secondary text-text-muted hover:text-text-primary transition-colors duration-200"
             >
               <FaTimes className="w-5 h-5" />
             </motion.button>
           </div>
-          
+
           <div className="overflow-y-auto p-6 max-h-[calc(90vh-80px)]">
             <form onSubmit={handleSubmit}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -307,6 +375,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         name="name"
                         value={formData.name}
                         onChange={handleChange}
+                        placeholder="Enter product name"
                         className={`w-full px-4 py-2 rounded-lg border ${errors.name ? 'border-error' : 'border-border-primary'} bg-background focus:outline-none focus:ring-2 focus:ring-primary/50`}
                       />
                       {errors.name && <p className="mt-1 text-sm text-error">{errors.name}</p>}
@@ -318,13 +387,14 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         name="slug"
                         value={formData.slug}
                         onChange={handleChange}
+                        placeholder="product-url-slug"
                         className={`w-full px-4 py-2 rounded-lg border ${errors.slug ? 'border-error' : 'border-border-primary'} bg-background focus:outline-none focus:ring-2 focus:ring-primary/50`}
                       />
                       {errors.slug && <p className="mt-1 text-sm text-error">{errors.slug}</p>}
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Description */}
                 <div className="md:col-span-2">
                   <label className="block text-text-secondary mb-1">Description</label>
@@ -332,11 +402,12 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                     name="description"
                     value={formData.description}
                     onChange={handleChange}
+                    placeholder="Detailed product description"
                     rows={4}
                     className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
-                
+
                 {/* Short Description */}
                 <div className="md:col-span-2">
                   <label className="block text-text-secondary mb-1">Short Description</label>
@@ -344,11 +415,12 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                     name="shortDescription"
                     value={formData.shortDescription}
                     onChange={handleChange}
+                    placeholder="Brief product summary"
                     rows={2}
                     className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
-                
+
                 {/* Pricing */}
                 <div className="md:col-span-2">
                   <h3 className="text-lg font-medium text-text-primary mb-4">Pricing</h3>
@@ -362,6 +434,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                           name="price"
                           value={formData.price}
                           onChange={handleChange}
+                          placeholder="0.00"
                           className={`w-full pl-8 pr-4 py-2 rounded-lg border ${errors.price ? 'border-error' : 'border-border-primary'} bg-background focus:outline-none focus:ring-2 focus:ring-primary/50`}
                         />
                       </div>
@@ -376,6 +449,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                           name="compareAtPrice"
                           value={formData.compareAtPrice}
                           onChange={handleChange}
+                          placeholder="0.00"
                           className={`w-full pl-8 pr-4 py-2 rounded-lg border ${errors.compareAtPrice ? 'border-error' : 'border-border-primary'} bg-background focus:outline-none focus:ring-2 focus:ring-primary/50`}
                         />
                       </div>
@@ -390,6 +464,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                           name="costPerItem"
                           value={formData.costPerItem}
                           onChange={handleChange}
+                          placeholder="0.00"
                           className={`w-full pl-8 pr-4 py-2 rounded-lg border ${errors.costPerItem ? 'border-error' : 'border-border-primary'} bg-background focus:outline-none focus:ring-2 focus:ring-primary/50`}
                         />
                       </div>
@@ -397,7 +472,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Inventory */}
                 <div className="md:col-span-2">
                   <h3 className="text-lg font-medium text-text-primary mb-4">Inventory</h3>
@@ -414,7 +489,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         />
                         <label htmlFor="trackQuantity" className="ml-2 text-text-secondary">Track quantity</label>
                       </div>
-                      
                       {formData.trackQuantity && (
                         <div>
                           <label className="block text-text-secondary mb-1">Quantity</label>
@@ -423,12 +497,12 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                             name="quantity"
                             value={formData.quantity}
                             onChange={handleChange}
+                            placeholder="0"
                             className={`w-full px-4 py-2 rounded-lg border ${errors.quantity ? 'border-error' : 'border-border-primary'} bg-background focus:outline-none focus:ring-2 focus:ring-primary/50`}
                           />
                           {errors.quantity && <p className="mt-1 text-sm text-error">{errors.quantity}</p>}
                         </div>
                       )}
-                      
                       {formData.trackQuantity && (
                         <div className="mt-4">
                           <div className="flex items-center">
@@ -445,7 +519,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         </div>
                       )}
                     </div>
-                    
                     <div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -455,6 +528,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                             name="sku"
                             value={formData.sku}
                             onChange={handleChange}
+                            placeholder="SKU-12345"
                             className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                           />
                         </div>
@@ -465,11 +539,11 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                             name="barcode"
                             value={formData.barcode}
                             onChange={handleChange}
+                            placeholder="123456789012"
                             className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                           />
                         </div>
                       </div>
-                      
                       <div className="grid grid-cols-2 gap-4 mt-4">
                         <div>
                           <label className="block text-text-secondary mb-1">Weight</label>
@@ -478,6 +552,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                             name="weight"
                             value={formData.weight}
                             onChange={handleChange}
+                            placeholder="0.0"
                             className={`w-full px-4 py-2 rounded-lg border ${errors.weight ? 'border-error' : 'border-border-primary'} bg-background focus:outline-none focus:ring-2 focus:ring-primary/50`}
                           />
                           {errors.weight && <p className="mt-1 text-sm text-error">{errors.weight}</p>}
@@ -500,7 +575,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Categories and Tags */}
                 <div>
                   <h3 className="text-lg font-medium text-text-primary mb-4">Categories</h3>
@@ -524,7 +599,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                     )}
                   </div>
                 </div>
-                
+
                 <div>
                   <h3 className="text-lg font-medium text-text-primary mb-4">Tags</h3>
                   <div className="flex flex-wrap gap-2 mb-4">
@@ -559,7 +634,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                     </button>
                   </div>
                 </div>
-                
+
                 {/* Images */}
                 <div className="md:col-span-2">
                   <h3 className="text-lg font-medium text-text-primary mb-4">Images</h3>
@@ -571,6 +646,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                           alt={`Product image ${index + 1}`}
                           fill
                           className="object-cover"
+                          unoptimized // For Cloudinary URLs
                         />
                         <button
                           type="button"
@@ -599,7 +675,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                     </label>
                   </div>
                 </div>
-                
+
                 {/* Status */}
                 <div className="md:col-span-2">
                   <h3 className="text-lg font-medium text-text-primary mb-4">Status</h3>
@@ -642,7 +718,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Additional Information */}
                 <div className="md:col-span-2">
                   <h3 className="text-lg font-medium text-text-primary mb-4">Additional Information</h3>
@@ -654,6 +730,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         name="type"
                         value={formData.type}
                         onChange={handleChange}
+                        placeholder="e.g., Electronics, Clothing"
                         className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                     </div>
@@ -664,12 +741,13 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         name="vendor"
                         value={formData.vendor}
                         onChange={handleChange}
+                        placeholder="e.g., Apple, Nike"
                         className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                     </div>
                   </div>
                 </div>
-                
+
                 {/* SEO */}
                 <div className="md:col-span-2">
                   <h3 className="text-lg font-medium text-text-primary mb-4">SEO</h3>
@@ -681,6 +759,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         name="seoTitle"
                         value={formData.seoTitle}
                         onChange={handleChange}
+                        placeholder="SEO optimized title (appears in search results)"
                         className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                     </div>
@@ -690,6 +769,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         name="seoDescription"
                         value={formData.seoDescription}
                         onChange={handleChange}
+                        placeholder="Brief description for search engines"
                         rows={2}
                         className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
@@ -697,13 +777,13 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                   </div>
                 </div>
               </div>
-              
+
               <div className="mt-8 flex justify-end space-x-4">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   type="button"
-                  onClick={onClose}
+                  onClick={handleClose}
                   className="px-6 py-2 border border-border-primary text-text-primary rounded-lg hover:bg-background-secondary transition-colors duration-300"
                   disabled={isSubmitting}
                 >
@@ -737,36 +817,58 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
   );
 };
 
-// Category Form Modal
 export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
     description: "",
-    image: null
+    image: { url: "", public_id: "" },
+    priority: "normal" // Added priority field with default value
   });
-  
+
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
-  
+  const [imagePreview, setImagePreview] = useState("");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const initialFormDataRef = useRef(null);
+  const modalRef = useRef(null);
+
   // Initialize form with category data if editing
   useEffect(() => {
     if (category) {
-      setFormData({
+      const initialData = {
         name: category.name || "",
         slug: category.slug || "",
         description: category.description || "",
-        image: category.image || null
-      });
+        image: category.image || { url: "", public_id: "" },
+        priority: category.priority || "normal"
+      };
       
-      if (category.image) {
-        setImagePreview(category.image);
+      setFormData(initialData);
+      initialFormDataRef.current = JSON.stringify(initialData);
+      
+      if (category.image && category.image.url) {
+        setImagePreview(category.image.url);
+      } else {
+        setImagePreview("");
       }
+    } else {
+      const initialData = {
+        name: "",
+        slug: "",
+        description: "",
+        image: { url: "", public_id: "" },
+        priority: "normal"
+      };
+      
+      setFormData(initialData);
+      initialFormDataRef.current = JSON.stringify(initialData);
+      setImagePreview("");
     }
-  }, [category]);
-  
+    
+    setHasUnsavedChanges(false);
+  }, [category, isOpen]);
+
   // Generate slug from name
   useEffect(() => {
     if (!category && formData.name && !formData.slug) {
@@ -774,104 +876,160 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
         .toLowerCase()
         .replace(/[^\w\s-]/g, '')
         .replace(/\s+/g, '-');
-      
       setFormData(prev => ({ ...prev, slug }));
     }
   }, [formData.name, category]);
-  
+
+  // Check for unsaved changes
+  useEffect(() => {
+    if (initialFormDataRef.current) {
+      const currentFormData = JSON.stringify(formData);
+      setHasUnsavedChanges(currentFormData !== initialFormDataRef.current);
+    }
+  }, [formData]);
+
+  // Restore auto-saved data if available
+  useEffect(() => {
+    if (!category && isOpen) {
+      const savedData = localStorage.getItem('categoryFormAutoSave');
+      if (savedData) {
+        try {
+          const parsedData = JSON.parse(savedData);
+          setFormData(parsedData);
+          if (parsedData.image && parsedData.image.url) {
+            setImagePreview(parsedData.image.url);
+          }
+          toast.info("Restored your unsaved changes.");
+          localStorage.removeItem('categoryFormAutoSave');
+        } catch (error) {
+          console.error("Error restoring auto-saved data:", error);
+        }
+      }
+    }
+  }, [isOpen, category]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    // Clear error when field is edited
+    setFormData(prev => ({ ...prev, [name]: value }));
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: null }));
     }
   };
-  
-  const handleImageChange = (e) => {
+
+  const uploadImageToCloudinary = async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to upload image");
+      }
+
+      const data = await response.json();
+      return { url: data.url, public_id: data.public_id };
+    } catch (error) {
+      console.error("Image upload error:", error);
+      toast.error(`Failed to upload image: ${error.message}`);
+      throw error;
+    }
+  };
+
+  const handleImageChange = async (e) => {
     const file = e.target.files[0];
-    
     if (!file) return;
-    
-    setImageFile(file);
-    
+
+    // Generate preview immediately
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result);
-    };
+    reader.onloadend = () => setImagePreview(reader.result);
     reader.readAsDataURL(file);
+
+    try {
+      const uploadedImage = await uploadImageToCloudinary(file);
+      setFormData(prev => ({ ...prev, image: uploadedImage }));
+    } catch (error) {
+      setImagePreview("");
+    }
   };
-  
-  const removeImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
-    setFormData(prev => ({ ...prev, image: null }));
+
+  const handleRemoveImage = () => {
+    setImagePreview("");
+    setFormData(prev => ({ ...prev, image: { url: "", public_id: "" } }));
   };
-  
+
   const validateForm = () => {
     const newErrors = {};
-    
     if (!formData.name.trim()) newErrors.name = "Name is required";
     if (!formData.slug.trim()) newErrors.slug = "Slug is required";
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!validateForm()) return;
-    
+
     setIsSubmitting(true);
-    
     try {
-      // Prepare data for submission
-      const categoryData = { ...formData };
-      
-      // Handle image upload here if needed
-      // This would typically involve uploading to a service like Cloudinary
-      // and then setting categoryData.image to the URL
-      
+      const categoryData = {
+        ...formData,
+        image: formData.image.url ? formData.image : null // Match backend model
+      };
+
       if (category) {
-        // Update existing category
         await updateCategory(categoryData);
         toast.success("Category updated successfully!");
       } else {
-        // Add new category
         await addCategory(categoryData);
         toast.success("Category added successfully!");
+        
+        // Clear image preview after successful addition
+        setImagePreview("");
+        setFormData({
+          name: "",
+          slug: "",
+          description: "",
+          image: { url: "", public_id: "" },
+          priority: "normal"
+        });
       }
+      
+      setHasUnsavedChanges(false);
+      
+      // Remove auto-saved data if exists
+      localStorage.removeItem('categoryFormAutoSave');
       
       onClose();
     } catch (error) {
-      console.error("Error saving category:", error);
-      toast.error("Failed to save category. Please try again.");
+      toast.error("Failed to save category.");
     } finally {
       setIsSubmitting(false);
     }
   };
-  
-  // Animation variants
+
+  const handleClose = () => {
+    if (hasUnsavedChanges) {
+      // Auto-save to localStorage
+      localStorage.setItem('categoryFormAutoSave', JSON.stringify(formData));
+      toast.info("Your changes have been auto-saved. They will be restored when you return.");
+    }
+    onClose();
+  };
+
   const modalVariants = {
     hidden: { opacity: 0, y: 50 },
     visible: { opacity: 1, y: 0, transition: { type: "spring", damping: 25, stiffness: 500 } },
-    exit: { opacity: 0, y: 50, transition: { duration: 0.2 } }
+    exit: { opacity: 0, y: 50 }
   };
-  
-  const backdropVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1 },
-    exit: { opacity: 0 }
-  };
-  
+  const backdropVariants = { hidden: { opacity: 0 }, visible: { opacity: 1 }, exit: { opacity: 0 } };
+
   if (!isOpen) return null;
-  
+
   return (
     <AnimatePresence>
       <motion.div
@@ -880,15 +1038,15 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
         initial="hidden"
         animate="visible"
         exit="exit"
-        onClick={onClose}
       >
         <motion.div
-          className="bg-surface-card rounded-xl shadow-xl w-full max-w-lg overflow-hidden"
+          ref={modalRef}
+          className="bg-surface-card rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden"
           variants={modalVariants}
           initial="hidden"
           animate="visible"
           exit="exit"
-          onClick={e => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         >
           <div className="flex justify-between items-center p-6 border-b border-border-primary">
             <h2 className="text-xl font-semibold text-text-primary">
@@ -897,14 +1055,14 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              onClick={onClose}
-              className="p-2 rounded-full hover:bg-background-secondary text-text-muted hover:text-text-primary transition-colors duration-200"
+              onClick={handleClose}
+              className="p-2 rounded-full hover:bg-background-secondary text-text-muted"
             >
               <FaTimes className="w-5 h-5" />
             </motion.button>
           </div>
-          
-          <div className="p-6">
+
+          <div className="overflow-y-auto p-6 max-h-[calc(90vh-80px)]">
             <form onSubmit={handleSubmit}>
               <div className="space-y-6">
                 <div>
@@ -914,11 +1072,13 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2 rounded-lg border ${errors.name ? 'border-error' : 'border-border-primary'} bg-background focus:outline-none focus:ring-2 focus:ring-primary/50`}
+                    placeholder="Enter category name"
+                    className={`w-full px-4 py-2 rounded-lg border ${
+                      errors.name ? "border-error" : "border-border-primary"
+                    } bg-background focus:outline-none focus:ring-2 focus:ring-primary/50`}
                   />
                   {errors.name && <p className="mt-1 text-sm text-error">{errors.name}</p>}
                 </div>
-                
                 <div>
                   <label className="block text-text-secondary mb-1">Slug*</label>
                   <input
@@ -926,24 +1086,41 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
                     name="slug"
                     value={formData.slug}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2 rounded-lg border ${errors.slug ? 'border-error' : 'border-border-primary'} bg-background focus:outline-none focus:ring-2 focus:ring-primary/50`}
+                    placeholder="category-url-slug"
+                    className={`w-full px-4 py-2 rounded-lg border ${
+                      errors.slug ? "border-error" : "border-border-primary"
+                    } bg-background focus:outline-none focus:ring-2 focus:ring-primary/50`}
                   />
                   {errors.slug && <p className="mt-1 text-sm text-error">{errors.slug}</p>}
                 </div>
-                
                 <div>
                   <label className="block text-text-secondary mb-1">Description</label>
                   <textarea
                     name="description"
                     value={formData.description}
                     onChange={handleChange}
+                    placeholder="Category description"
                     rows={3}
                     className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
-                
                 <div>
-                  <label className="block text-text-secondary mb-4">Category Image</label>
+                  <label className="block text-text-secondary mb-1">Priority</label>
+                  <select
+                    name="priority"
+                    value={formData.priority}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value="main">Main (Featured on homepage)</option>
+                    <option value="normal">Normal</option>
+                  </select>
+                  <p className="mt-1 text-xs text-text-muted">
+                    Main categories will be prominently displayed on the homepage
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-text-secondary mb-2">Category Image</label>
                   {imagePreview ? (
                     <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border-primary mb-4">
                       <Image
@@ -951,17 +1128,18 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
                         alt="Category image"
                         fill
                         className="object-cover"
+                        unoptimized // For Cloudinary URLs
                       />
                       <button
                         type="button"
-                        onClick={removeImage}
-                        className="absolute top-2 right-2 p-1 bg-error text-white rounded-full hover:bg-error-dark transition-colors duration-200"
+                        onClick={handleRemoveImage}
+                        className="absolute top-2 right-2 p-1 bg-error text-white rounded-full hover:bg-error-dark"
                       >
                         <FaTrash className="w-3 h-3" />
                       </button>
                     </div>
                   ) : (
-                    <label className="block w-32 h-32 rounded-lg border-2 border-dashed border-border-primary bg-background hover:bg-background-secondary transition-colors duration-200 flex flex-col items-center justify-center cursor-pointer mb-4">
+                    <label className="block w-32 h-32 rounded-lg border-2 border-dashed border-border-primary bg-background hover:bg-background-secondary flex flex-col items-center justify-center cursor-pointer mb-4">
                       <FaUpload className="w-8 h-8 text-text-muted mb-2" />
                       <span className="text-text-muted text-sm text-center">Upload Image</span>
                       <input
@@ -974,14 +1152,14 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
                   )}
                 </div>
               </div>
-              
+
               <div className="mt-8 flex justify-end space-x-4">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   type="button"
-                  onClick={onClose}
-                  className="px-6 py-2 border border-border-primary text-text-primary rounded-lg hover:bg-background-secondary transition-colors duration-300"
+                  onClick={handleClose}
+                  className="px-6 py-2 border border-border-primary text-text-primary rounded-lg hover:bg-background-secondary"
                   disabled={isSubmitting}
                 >
                   Cancel
@@ -990,7 +1168,7 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   type="submit"
-                  className="px-6 py-2 bg-primary text-text-inverted rounded-lg hover:bg-primary-dark transition-colors duration-300 flex items-center"
+                  className="px-6 py-2 bg-primary text-text-inverted rounded-lg hover:bg-primary-dark flex items-center"
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? (
@@ -1014,10 +1192,11 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
   );
 };
 
-// Delete Confirmation Modal
+// DeleteConfirmationModal remains unchanged
 export const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemType, itemName }) => {
   const [isDeleting, setIsDeleting] = useState(false);
-  
+  const modalRef = useRef(null);
+
   const handleConfirm = async () => {
     setIsDeleting(true);
     try {
@@ -1031,22 +1210,21 @@ export const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemType, 
       setIsDeleting(false);
     }
   };
-  
-  // Animation variants
+
   const modalVariants = {
     hidden: { opacity: 0, scale: 0.8 },
     visible: { opacity: 1, scale: 1, transition: { type: "spring", damping: 25, stiffness: 500 } },
     exit: { opacity: 0, scale: 0.8, transition: { duration: 0.2 } }
   };
-  
+
   const backdropVariants = {
     hidden: { opacity: 0 },
     visible: { opacity: 1 },
     exit: { opacity: 0 }
   };
-  
+
   if (!isOpen) return null;
-  
+
   return (
     <AnimatePresence>
       <motion.div
@@ -1055,15 +1233,15 @@ export const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemType, 
         initial="hidden"
         animate="visible"
         exit="exit"
-        onClick={onClose}
       >
         <motion.div
+          ref={modalRef}
           className="bg-surface-card rounded-xl shadow-xl w-full max-w-md overflow-hidden"
           variants={modalVariants}
           initial="hidden"
           animate="visible"
           exit="exit"
-          onClick={e => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         >
           <div className="p-6">
             <div className="flex items-center justify-center mb-4">
@@ -1077,7 +1255,6 @@ export const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemType, 
             <p className="text-text-secondary text-center mb-6">
               Are you sure you want to delete {itemType.toLowerCase()} "{itemName}"? This action cannot be undone.
             </p>
-            
             <div className="flex justify-center space-x-4">
               <motion.button
                 whileHover={{ scale: 1.05 }}

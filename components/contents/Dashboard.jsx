@@ -92,10 +92,8 @@ export default function Dashboard({ session }) {
   const confirmDeleteCategory = async () => {
     try {
       await deleteCategory(deleteItem.id);
-      toast.success("Category deleted successfully!");
     } catch (error) {
       console.error("Error deleting category:", error);
-      toast.error("Failed to delete category");
       throw error;
     }
   };

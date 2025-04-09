@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect , useMemo } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
@@ -144,11 +144,13 @@ export const deleteProduct = async (slug) => {
   }
 };
 
-// Hook for fetching categories
-export const useCategories = () => {
+// Hook for fetching categories with sorting and filtering
+export const useCategories = (initialSort = "name", initialDirection = "asc") => {
   const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
+  const [sortField, setSortField] = useState(initialSort);
+  const [sortDirection, setSortDirection] = useState(initialDirection);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -170,22 +172,44 @@ export const useCategories = () => {
     fetchCategories();
   }, []);
 
+  const sortedCategories = useMemo(() => {
+    return [...categories].sort((a, b) => {
+      // Handle priority sorting (main comes first)
+      if (sortField === "priority") {
+        if (a.priority === "main" && b.priority !== "main") return sortDirection === "asc" ? -1 : 1;
+        if (a.priority !== "main" && b.priority === "main") return sortDirection === "asc" ? 1 : -1;
+      }
+      
+      // Handle other fields
+      const aValue = a[sortField] || "";
+      const bValue = b[sortField] || "";
+      
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [categories, sortField, sortDirection]);
+
   return {
-    categories,
+    categories: sortedCategories,
     isLoading,
-    isError
+    isError,
+    sortField,
+    sortDirection,
+    setSortField,
+    setSortDirection
   };
 };
 
 // Function to add a new category
 export const addCategory = async (categoryData) => {
   try {
-    const response = await axios.post('/api/admin/category', categoryData);
-    toast.success('Category added successfully!');
+    const response = await axios.post("/api/admin/category", categoryData);
+    toast.success("Category added successfully!");
     return response.data;
   } catch (error) {
-    console.error('Error adding category:', error);
-    toast.error(error.response?.data?.message || 'Failed to add category');
+    console.error("Error adding category:", error);
+    toast.error(error.response?.data?.error || "Failed to add category");
     throw error;
   }
 };
@@ -193,12 +217,12 @@ export const addCategory = async (categoryData) => {
 // Function to update an existing category
 export const updateCategory = async (categoryData) => {
   try {
-    const response = await axios.put('/api/admin/category', categoryData);
-    toast.success('Category updated successfully!');
+    const response = await axios.put("/api/admin/category", categoryData);
+    toast.success("Category updated successfully!");
     return response.data;
   } catch (error) {
-    console.error('Error updating category:', error);
-    toast.error(error.response?.data?.message || 'Failed to update category');
+    console.error("Error updating category:", error);
+    toast.error(error.response?.data?.error || "Failed to update category");
     throw error;
   }
 };
@@ -209,11 +233,10 @@ export const deleteCategory = async (slug) => {
     await axios.delete('/api/admin/category', {
       data: { slug }
     });
-    toast.success('Category deleted successfully!');
     return true;
   } catch (error) {
     console.error('Error deleting category:', error);
-    toast.error(error.response?.data?.message || 'Failed to delete category');
     throw error;
   }
 };
+

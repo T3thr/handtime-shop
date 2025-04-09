@@ -1,20 +1,15 @@
-import { NextResponse } from 'next/server';
-import dbConnect from '@/backend/lib/mongodb';
-import Category from '@/backend/models/Category';
-import { getServerSession } from 'next-auth/next';
-import { options } from '@/app/api/auth/[...nextauth]/options';
-import { Server } from 'socket.io';
+import { NextResponse } from "next/server";
+import dbConnect from "@/backend/lib/mongodb";
+import Category from "@/backend/models/Category";
+import { getServerSession } from "next-auth/next";
+import { options } from "@/app/api/auth/[...nextauth]/options";
 
 const verifyAdminSession = async () => {
   const session = await getServerSession(options);
-  if (!session || session.user.role !== 'admin') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!session || session.user.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   return session;
-};
-
-const sendToClients = (io, event, data) => {
-  io.emit(event, data); // Emit the event to all connected clients
 };
 
 export async function POST(request) {
@@ -25,23 +20,34 @@ export async function POST(request) {
     await dbConnect();
     const data = await request.json();
 
-    const slug = data.name ? data.name.toLowerCase().replace(/\s+/g, '-') : '';
-
-    const category = new Category({
-      ...data,
-      createdBy: session.user.id,
+    const slug = data.slug || data.name.toLowerCase().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-");
+    const categoryData = {
+      name: data.name,
       slug,
-    });
+      description: data.description || "",
+      image: data.image && data.image.url ? { 
+        url: data.image.url,
+        public_id: data.image.public_id 
+      } : null,
+      priority: data.priority || "normal",
+      createdBy: session.user.id,
+    };
 
+    const category = new Category(categoryData);
     await category.save();
 
-    // Emit event to clients after saving the category
-    const io = request.socket.server.io; // Access the Socket.IO server
-    sendToClients(io, "category_added", category);
+    // Emit event if Socket.IO is configured
+    if (request.socket?.server?.io) {
+      request.socket.server.io.emit("category_added", category);
+    }
 
     return NextResponse.json(category, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: error.message || 'Failed to add category' }, { status: 400 });
+    console.error("Error adding category:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to add category" }, 
+      { status: 400 }
+    );
   }
 }
 
@@ -53,29 +59,40 @@ export async function PUT(request) {
     await dbConnect();
     const data = await request.json();
 
+    const slug = data.slug || data.name.toLowerCase().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-");
     const updatedCategory = {
-      ...data,
+      name: data.name,
+      slug,
+      description: data.description || "",
+      image: data.image && data.image.url ? { 
+        url: data.image.url,
+        public_id: data.image.public_id 
+      } : null,
+      priority: data.priority || "normal",
       updatedBy: session.user.id,
-      slug: data.name ? data.name.toLowerCase().replace(/\s+/g, '-') : data.slug,
     };
 
     const category = await Category.findOneAndUpdate(
-      { slug: data.slug },
-      updatedCategory,
+      { slug: data.slug }, 
+      updatedCategory, 
       { new: true }
     );
-
+    
     if (!category) {
-      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+      return NextResponse.json({ error: "Category not found" }, { status: 404 });
     }
 
-    // Emit event to clients after updating the category
-    const io = request.socket.server.io;
-    sendToClients(io, "category_updated", category);
+    if (request.socket?.server?.io) {
+      request.socket.server.io.emit("category_updated", category);
+    }
 
     return NextResponse.json(category);
   } catch (error) {
-    return NextResponse.json({ error: error.message || 'Failed to update category' }, { status: 400 });
+    console.error("Error updating category:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to update category" }, 
+      { status: 400 }
+    );
   }
 }
 
@@ -87,16 +104,21 @@ export async function DELETE(request) {
     await dbConnect();
     const { slug } = await request.json();
     const category = await Category.findOneAndDelete({ slug });
+    
     if (!category) {
-      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+      return NextResponse.json({ error: "Category not found" }, { status: 404 });
     }
 
-    // Emit event to clients after deleting the category
-    const io = request.socket.server.io;
-    sendToClients(io, "category_deleted", slug);
+    if (request.socket?.server?.io) {
+      request.socket.server.io.emit("category_deleted", slug);
+    }
 
-    return NextResponse.json({ message: 'Category deleted successfully' });
+    return NextResponse.json({ message: "Category deleted successfully" });
   } catch (error) {
-    return NextResponse.json({ error: error.message || 'Failed to delete category' }, { status: 400 });
+    console.error("Error deleting category:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to delete category" }, 
+      { status: 400 }
+    );
   }
 }

@@ -1,64 +1,48 @@
-import mongoose, { Schema } from 'mongoose';
+import mongoose from "mongoose";
 
-const CategorySchema = new Schema({
-  name: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-    maxlength: 50,
-  },
-  slug: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-    lowercase: true,
-  },
-  description: {
-    type: String,
-    trim: true,
-    maxlength: 500,
-  },
-  image: {
-    url: {
+const categorySchema = new mongoose.Schema(
+  {
+    name: {
       type: String,
-      required: false,
-      validate: {
-        validator: function (v) {
-          return /^(https?:\/\/).+\.(jpg|jpeg|png|webp|gif)$/.test(v);
-        },
-        message: (props) => `${props.value} is not a valid image URL!`,
-      },
-    },
-    altText: {
-      type: String,
-      required: false,
+      required: true,
       trim: true,
-      maxlength: 100,
+      unique: true,
+    },
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    image: {
+      url: String,
+      public_id: String,
+    },
+    priority: {
+      type: String,
+      enum: ["main", "normal"],
+      default: "normal",
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
     },
   },
-  createdBy: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-  },
-  updatedBy: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-  },
-}, {
-  timestamps: true,
-  toJSON: {
-    virtuals: true,
-    transform: function (doc, ret) {
-      delete ret.__v;
-      return ret;
-    },
-  },
-});
+  { timestamps: true }
+);
 
-CategorySchema.index({ name: 'text', description: 'text' });
+// Add indexes for better performance
+categorySchema.index({ name: 1, slug: 1, priority: 1 });
 
-const Category = mongoose.models.Category || mongoose.model('Category', CategorySchema);
+const Category = mongoose.models.Category || mongoose.model("Category", categorySchema);
+
 export default Category;
