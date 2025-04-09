@@ -29,7 +29,7 @@ export function CartProvider({ children }) {
       setCartItems(cart || []);
     } catch (error) {
       console.error("Error fetching cart:", error);
-      toast.error("Failed to load your cart");
+      //toast.error("Failed to load your cart");
     } finally {
       setLoading(false);
     }

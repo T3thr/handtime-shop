@@ -31,10 +31,7 @@ export const AuthProvider = ({ children }) => {
           const profile = await liff.getProfile();
           setLineProfile(profile);
           if (status === "unauthenticated") {
-            const result = await lineSignIn(profile);
-            if (!result.success) {
-              console.error("Initial LINE sign-in failed:", result.message);
-            }
+            await lineSignIn(profile);
           }
         }
       } catch (error) {
@@ -164,7 +161,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (res?.ok) {
-        await update();
+        await update(); // Force session update
         toast.success("LINE login successful!");
         return { success: true };
       }

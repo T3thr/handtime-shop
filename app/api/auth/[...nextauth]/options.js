@@ -34,15 +34,11 @@ export const options = {
               isVerified: true,
               lastLogin: new Date(),
             });
-            console.log(`Created new LINE user: ${user.lineId}`);
           } else {
             user.lastLogin = new Date();
-            if (credentials.pictureUrl && /^(https?:\/\/).+/.test(credentials.pictureUrl)) {
-              user.avatar = credentials.pictureUrl;
-            }
+            if (credentials.pictureUrl) user.avatar = credentials.pictureUrl;
             if (credentials.displayName) user.name = credentials.displayName;
             await user.save();
-            console.log(`Updated LINE user: ${user.lineId}`);
           }
 
           return {
@@ -55,7 +51,7 @@ export const options = {
           };
         } catch (error) {
           console.error("LINE authorization error:", error);
-          throw new Error(error.message || "LINE authentication failed");
+          throw new Error(error.message || "Authentication failed");
         }
       },
     }),
@@ -96,7 +92,7 @@ export const options = {
           };
         } catch (error) {
           console.error("Admin authorization error:", error);
-          throw new Error(error.message || "Admin authentication failed");
+          throw error;
         }
       },
     }),
@@ -138,17 +134,9 @@ export const options = {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  cookies: {
-    sessionToken: {
-      name: `__Secure-next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-      },
-    },
+  jwt: {
+    secret: process.env.NEXTAUTH_SECRET,
   },
 };
 
-export default options;
+export default NextAuth(options);

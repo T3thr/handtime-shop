@@ -41,7 +41,6 @@ export async function POST(request) {
         },
       });
       await user.save();
-      console.log(`Registered new LINE user: ${user.lineId}`);
     } else {
       user.lastLogin = new Date();
       if (!user.avatar && pictureUrl && /^(https?:\/\/).+/.test(pictureUrl)) {
@@ -51,7 +50,6 @@ export async function POST(request) {
         user.name = displayName;
       }
       await user.save();
-      console.log(`Updated existing LINE user: ${user.lineId}`);
     }
 
     return NextResponse.json({

@@ -47,7 +47,7 @@ export default function Product() {
         setWishlist(response.data.wishlist.map((item) => item.productId.toString()));
       } catch (error) {
         console.error("Failed to fetch wishlist:", error);
-        toast.error("Could not load wishlist");
+        //toast.error("Could not load wishlist");
       }
     };
 

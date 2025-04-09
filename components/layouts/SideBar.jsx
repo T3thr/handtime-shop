@@ -1,4 +1,3 @@
-// components/layouts/SideBar.jsx
 "use client";
 import React, { useState, useCallback, useContext, useEffect } from "react";
 import Link from "next/link";
@@ -47,16 +46,12 @@ export default function SideBar() {
     setIsLineLoading(true);
     try {
       const { default: liff } = await import("@line/liff");
-      if (!process.env.NEXT_PUBLIC_LIFF_ID) {
-        throw new Error("LIFF ID is not configured");
-      }
-
-      if (!liff.isInited) {
+      if (!liff._liffId) {
         await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
       }
 
       if (!liff.isLoggedIn()) {
-        liff.login({ redirectUri: window.location.href });
+        liff.login({ redirectUri: `${window.location.origin}/auth/callback/line` });
         return;
       }
 
@@ -66,10 +61,13 @@ export default function SideBar() {
       if (!result.success) {
         throw new Error(result.message);
       }
+
       closeSidebar();
     } catch (error) {
       console.error("LINE login error:", error);
-      toast.error(error.message || "LINE login failed. Please try again.");
+      if (!error.message?.includes("redirect")) {
+        toast.error("LINE login failed. Please try again.");
+      }
     } finally {
       setIsLineLoading(false);
     }
@@ -222,7 +220,7 @@ export default function SideBar() {
                     </div>
                     <button
                       onClick={closeSidebar}
-                      className="p-2 hover:bg-container rounded-full flexed-shrink-0"
+                      className="p-2 hover:bg-container rounded-full flex-shrink-0"
                       aria-label="Close menu"
                     >
                       <X className="h-5 w-5 text-foreground" />
