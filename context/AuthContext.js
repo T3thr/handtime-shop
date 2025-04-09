@@ -162,10 +162,10 @@ export const AuthProvider = ({ children }) => {
 
       if (res?.ok) {
         await update(); // Force session update
+        window.location.reload(); // Reload the page after success
         toast.success("LINE login successful!");
         return { success: true };
       }
-
       return { success: false, message: "Unknown error occurred" };
     } catch (error) {
       console.error("LINE signin error:", error);
