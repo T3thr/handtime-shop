@@ -25,11 +25,8 @@ export async function POST(request) {
       name: data.name,
       slug,
       description: data.description || "",
-      image: data.image && data.image.url ? { 
-        url: data.image.url,
-        public_id: data.image.public_id 
-      } : null,
-      priority: data.priority || "normal",
+      image: data.image && data.image.url ? { url: data.image.url, public_id: data.image.public_id } : undefined,
+      priority: data.priority || "normal", // Add priority field with default value
       createdBy: session.user.id,
     };
 
@@ -44,10 +41,7 @@ export async function POST(request) {
     return NextResponse.json(category, { status: 201 });
   } catch (error) {
     console.error("Error adding category:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to add category" }, 
-      { status: 400 }
-    );
+    return NextResponse.json({ error: error.message || "Failed to add category" }, { status: 400 });
   }
 }
 
@@ -64,20 +58,12 @@ export async function PUT(request) {
       name: data.name,
       slug,
       description: data.description || "",
-      image: data.image && data.image.url ? { 
-        url: data.image.url,
-        public_id: data.image.public_id 
-      } : null,
-      priority: data.priority || "normal",
+      image: data.image && data.image.url ? { url: data.image.url, public_id: data.image.public_id } : undefined,
+      priority: data.priority || "normal", // Add priority field with default value
       updatedBy: session.user.id,
     };
 
-    const category = await Category.findOneAndUpdate(
-      { slug: data.slug }, 
-      updatedCategory, 
-      { new: true }
-    );
-    
+    const category = await Category.findOneAndUpdate({ slug: data.slug }, updatedCategory, { new: true });
     if (!category) {
       return NextResponse.json({ error: "Category not found" }, { status: 404 });
     }
@@ -89,10 +75,7 @@ export async function PUT(request) {
     return NextResponse.json(category);
   } catch (error) {
     console.error("Error updating category:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to update category" }, 
-      { status: 400 }
-    );
+    return NextResponse.json({ error: error.message || "Failed to update category" }, { status: 400 });
   }
 }
 
@@ -104,7 +87,6 @@ export async function DELETE(request) {
     await dbConnect();
     const { slug } = await request.json();
     const category = await Category.findOneAndDelete({ slug });
-    
     if (!category) {
       return NextResponse.json({ error: "Category not found" }, { status: 404 });
     }
@@ -116,9 +98,6 @@ export async function DELETE(request) {
     return NextResponse.json({ message: "Category deleted successfully" });
   } catch (error) {
     console.error("Error deleting category:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to delete category" }, 
-      { status: 400 }
-    );
+    return NextResponse.json({ error: error.message || "Failed to delete category" }, { status: 400 });
   }
 }

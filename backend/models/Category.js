@@ -1,26 +1,29 @@
 import mongoose from "mongoose";
 
-const categorySchema = new mongoose.Schema(
+const CategorySchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: true,
+      required: [true, "Please provide a category name"],
       trim: true,
-      unique: true,
     },
     slug: {
       type: String,
-      required: true,
+      required: [true, "Please provide a category slug"],
       unique: true,
+      trim: true,
     },
     description: {
       type: String,
-      trim: true,
       default: "",
     },
     image: {
-      url: String,
-      public_id: String,
+      url: {
+        type: String,
+      },
+      public_id: {
+        type: String,
+      },
     },
     priority: {
       type: String,
@@ -30,7 +33,6 @@ const categorySchema = new mongoose.Schema(
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
     },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -40,9 +42,4 @@ const categorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Add indexes for better performance
-categorySchema.index({ name: 1, slug: 1, priority: 1 });
-
-const Category = mongoose.models.Category || mongoose.model("Category", categorySchema);
-
-export default Category;
+export default mongoose.models.Category || mongoose.model("Category", CategorySchema);

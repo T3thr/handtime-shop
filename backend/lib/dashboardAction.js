@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect , useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
@@ -16,29 +16,29 @@ export const useProducts = (initialPage = 1, initialLimit = 50) => {
     totalPages: 0
   });
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      setIsLoading(true);
-      setIsError(false);
-      
-      try {
-        const response = await axios.get(`/api/products?page=${pagination.page}&limit=${pagination.limit}`);
-        setProducts(response.data.products || []);
-        setPagination({
-          page: response.data.page || pagination.page,
-          limit: response.data.limit || pagination.limit,
-          total: response.data.total || 0,
-          totalPages: response.data.totalPages || 0
-        });
-      } catch (error) {
-        console.error('Error fetching products:', error);
-        setIsError(true);
-        toast.error('Failed to load products. Please try again.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const fetchProducts = async () => {
+    setIsLoading(true);
+    setIsError(false);
+    
+    try {
+      const response = await axios.get(`/api/products?page=${pagination.page}&limit=${pagination.limit}`);
+      setProducts(response.data.products || []);
+      setPagination({
+        page: response.data.page || pagination.page,
+        limit: response.data.limit || pagination.limit,
+        total: response.data.total || 0,
+        totalPages: response.data.totalPages || 0
+      });
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      setIsError(true);
+      toast.error('Failed to load products. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchProducts();
   }, [pagination.page, pagination.limit]);
 
@@ -63,7 +63,8 @@ export const useProducts = (initialPage = 1, initialLimit = 50) => {
     isError,
     pagination,
     changePage,
-    changeLimit
+    changeLimit,
+    refetch: fetchProducts // Added refetch function
   };
 };
 
@@ -144,60 +145,37 @@ export const deleteProduct = async (slug) => {
   }
 };
 
-// Hook for fetching categories with sorting and filtering
-export const useCategories = (initialSort = "name", initialDirection = "asc") => {
+// Hook for fetching categories
+export const useCategories = () => {
   const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
-  const [sortField, setSortField] = useState(initialSort);
-  const [sortDirection, setSortDirection] = useState(initialDirection);
+
+  const fetchCategories = async () => {
+    setIsLoading(true);
+    setIsError(false);
+    
+    try {
+      const response = await axios.get('/api/category');
+      setCategories(response.data || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      setIsError(true);
+      toast.error('Failed to load categories. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchCategories = async () => {
-      setIsLoading(true);
-      setIsError(false);
-      
-      try {
-        const response = await axios.get('/api/category');
-        setCategories(response.data || []);
-      } catch (error) {
-        console.error('Error fetching categories:', error);
-        setIsError(true);
-        toast.error('Failed to load categories. Please try again.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchCategories();
   }, []);
 
-  const sortedCategories = useMemo(() => {
-    return [...categories].sort((a, b) => {
-      // Handle priority sorting (main comes first)
-      if (sortField === "priority") {
-        if (a.priority === "main" && b.priority !== "main") return sortDirection === "asc" ? -1 : 1;
-        if (a.priority !== "main" && b.priority === "main") return sortDirection === "asc" ? 1 : -1;
-      }
-      
-      // Handle other fields
-      const aValue = a[sortField] || "";
-      const bValue = b[sortField] || "";
-      
-      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
-      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
-      return 0;
-    });
-  }, [categories, sortField, sortDirection]);
-
   return {
-    categories: sortedCategories,
+    categories,
     isLoading,
     isError,
-    sortField,
-    sortDirection,
-    setSortField,
-    setSortDirection
+    refetch: fetchCategories
   };
 };
 
@@ -233,10 +211,74 @@ export const deleteCategory = async (slug) => {
     await axios.delete('/api/admin/category', {
       data: { slug }
     });
+    toast.success('Category deleted successfully!');
     return true;
   } catch (error) {
     console.error('Error deleting category:', error);
+    toast.error(error.response?.data?.message || 'Failed to delete category');
     throw error;
   }
 };
 
+// Hook for fetching users (for user management)
+export const useUsers = (initialPage = 1, initialLimit = 10) => {
+  const [users, setUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
+  const [pagination, setPagination] = useState({
+    page: initialPage,
+    limit: initialLimit,
+    total: 0,
+    totalPages: 0
+  });
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setIsLoading(true);
+      setIsError(false);
+      
+      try {
+        const response = await axios.get(`/api/admin/users?page=${pagination.page}&limit=${pagination.limit}`);
+        setUsers(response.data.users || []);
+        setPagination({
+          page: response.data.page || pagination.page,
+          limit: response.data.limit || pagination.limit,
+          total: response.data.total || 0,
+          totalPages: response.data.totalPages || 0
+        });
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        setIsError(true);
+        toast.error('Failed to load users. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, [pagination.page, pagination.limit]);
+
+  const changePage = (newPage) => {
+    setPagination(prev => ({
+      ...prev,
+      page: newPage
+    }));
+  };
+
+  const changeLimit = (newLimit) => {
+    setPagination(prev => ({
+      ...prev,
+      limit: newLimit,
+      page: 1 // Reset to first page when changing limit
+    }));
+  };
+
+  return {
+    users,
+    isLoading,
+    isError,
+    pagination,
+    changePage,
+    changeLimit
+  };
+};

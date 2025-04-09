@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { FaTimes, FaUpload, FaTrash, FaPlus, FaCheck, FaExclamationTriangle, FaTag, FaBoxOpen, FaStar } from "react-icons/fa";
 import { addProduct, updateProduct, addCategory, updateCategory } from "@/backend/lib/dashboardAction";
 
-export const ProductFormModal = ({ isOpen, onClose, product = null, categories = [] }) => {
+export const ProductFormModal = ({ isOpen, onClose, product = null, categories = [], refetchProducts }) => {
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -26,7 +26,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
     categories: [],
     tags: [],
     status: "active",
-    images: [], // Array of { url, public_id } objects from Cloudinary
+    images: [],
     seoTitle: "",
     seoDescription: "",
     shortDescription: "",
@@ -36,14 +36,13 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [imageFiles, setImageFiles] = useState([]); // Files to upload
-  const [imagePreviewUrls, setImagePreviewUrls] = useState([]); // URLs for preview
+  const [imageFiles, setImageFiles] = useState([]);
+  const [imagePreviewUrls, setImagePreviewUrls] = useState([]);
   const [newTag, setNewTag] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const initialFormDataRef = useRef(null);
   const modalRef = useRef(null);
 
-  // Initialize form with product data if editing
   useEffect(() => {
     if (product) {
       const initialData = {
@@ -74,12 +73,10 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
       setFormData(initialData);
       initialFormDataRef.current = JSON.stringify(initialData);
 
-      // Set image previews for existing Cloudinary images
       if (product.images && product.images.length > 0) {
         setImagePreviewUrls(product.images.map(img => img.url));
       }
     } else {
-      // Reset form for new product
       const initialData = {
         name: "",
         slug: "",
@@ -114,7 +111,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
     setHasUnsavedChanges(false);
   }, [product, isOpen]);
 
-  // Generate slug from name
   useEffect(() => {
     if (!product && formData.name && !formData.slug) {
       const slug = formData.name
@@ -125,7 +121,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
     }
   }, [formData.name, product]);
 
-  // Check for unsaved changes
   useEffect(() => {
     if (initialFormDataRef.current) {
       const currentFormData = JSON.stringify(formData);
@@ -207,7 +202,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
 
     for (const file of files) {
       try {
-        // Generate preview URL immediately
         const reader = new FileReader();
         reader.onloadend = () => {
           newPreviewUrls.push(reader.result);
@@ -215,12 +209,10 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
         };
         reader.readAsDataURL(file);
 
-        // Upload to Cloudinary
         const uploadedImage = await uploadImageToCloudinary(file);
         newImages.push(uploadedImage);
         setFormData(prev => ({ ...prev, images: newImages }));
       } catch (error) {
-        // Error is already toasted in uploadImageToCloudinary
         continue;
       }
     }
@@ -232,16 +224,13 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
     const newImageFiles = [...imageFiles];
 
     if (index < newImages.length) {
-      // Remove existing Cloudinary image
       newImages.splice(index, 1);
       setFormData(prev => ({ ...prev, images: newImages }));
     }
 
-    // Remove from previews
     newPreviewUrls.splice(index, 1);
     setImagePreviewUrls(newPreviewUrls);
 
-    // Adjust imageFiles if it's a new upload
     if (index >= formData.images.length && newImageFiles.length > 0) {
       const fileIndex = index - formData.images.length;
       newImageFiles.splice(fileIndex, 1);
@@ -297,6 +286,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
       }
 
       setHasUnsavedChanges(false);
+      refetchProducts(); // Refetch products after action
       onClose();
     } catch (error) {
       console.error("Error saving product:", error);
@@ -308,7 +298,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
 
   const handleClose = () => {
     if (hasUnsavedChanges) {
-      // Auto-save to localStorage
       localStorage.setItem('productFormAutoSave', JSON.stringify(formData));
       toast.info("Your changes have been auto-saved. They will be restored when you return.");
     }
@@ -646,7 +635,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                           alt={`Product image ${index + 1}`}
                           fill
                           className="object-cover"
-                          unoptimized // For Cloudinary URLs
+                          unoptimized
                         />
                         <button
                           type="button"
@@ -730,7 +719,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         name="type"
                         value={formData.type}
                         onChange={handleChange}
-                        placeholder="e.g., Electronics, Clothing"
+                        placeholder="e.g., Handcraft, Jewelry"
                         className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                     </div>
@@ -741,7 +730,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         name="vendor"
                         value={formData.vendor}
                         onChange={handleChange}
-                        placeholder="e.g., Apple, Nike"
+                        placeholder="e.g., Uttaradit Artisan"
                         className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                     </div>
@@ -817,13 +806,13 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
   );
 };
 
-export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
+export const CategoryFormModal = ({ isOpen, onClose, category = null, refetchCategories }) => {
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
     description: "",
     image: { url: "", public_id: "" },
-    priority: "normal" // Added priority field with default value
+    priority: "normal"
   });
 
   const [errors, setErrors] = useState({});
@@ -833,7 +822,6 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
   const initialFormDataRef = useRef(null);
   const modalRef = useRef(null);
 
-  // Initialize form with category data if editing
   useEffect(() => {
     if (category) {
       const initialData = {
@@ -869,7 +857,6 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
     setHasUnsavedChanges(false);
   }, [category, isOpen]);
 
-  // Generate slug from name
   useEffect(() => {
     if (!category && formData.name && !formData.slug) {
       const slug = formData.name
@@ -880,7 +867,6 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
     }
   }, [formData.name, category]);
 
-  // Check for unsaved changes
   useEffect(() => {
     if (initialFormDataRef.current) {
       const currentFormData = JSON.stringify(formData);
@@ -888,7 +874,6 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
     }
   }, [formData]);
 
-  // Restore auto-saved data if available
   useEffect(() => {
     if (!category && isOpen) {
       const savedData = localStorage.getItem('categoryFormAutoSave');
@@ -944,7 +929,6 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Generate preview immediately
     const reader = new FileReader();
     reader.onloadend = () => setImagePreview(reader.result);
     reader.readAsDataURL(file);
@@ -978,7 +962,7 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
     try {
       const categoryData = {
         ...formData,
-        image: formData.image.url ? formData.image : null // Match backend model
+        image: formData.image.url ? formData.image : null
       };
 
       if (category) {
@@ -988,7 +972,6 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
         await addCategory(categoryData);
         toast.success("Category added successfully!");
         
-        // Clear image preview after successful addition
         setImagePreview("");
         setFormData({
           name: "",
@@ -1000,10 +983,8 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
       }
       
       setHasUnsavedChanges(false);
-      
-      // Remove auto-saved data if exists
       localStorage.removeItem('categoryFormAutoSave');
-      
+      refetchCategories(); // Refetch categories after action
       onClose();
     } catch (error) {
       toast.error("Failed to save category.");
@@ -1014,7 +995,6 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
 
   const handleClose = () => {
     if (hasUnsavedChanges) {
-      // Auto-save to localStorage
       localStorage.setItem('categoryFormAutoSave', JSON.stringify(formData));
       toast.info("Your changes have been auto-saved. They will be restored when you return.");
     }
@@ -1128,7 +1108,7 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
                         alt="Category image"
                         fill
                         className="object-cover"
-                        unoptimized // For Cloudinary URLs
+                        unoptimized
                       />
                       <button
                         type="button"
@@ -1192,8 +1172,7 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
   );
 };
 
-// DeleteConfirmationModal remains unchanged
-export const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemType, itemName }) => {
+export const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemType, itemName, refetch }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const modalRef = useRef(null);
 
@@ -1202,6 +1181,7 @@ export const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemType, 
     try {
       await onConfirm();
       toast.success(`${itemType} deleted successfully!`);
+      if (refetch) refetch(); // Refetch data after deletion
       onClose();
     } catch (error) {
       console.error(`Error deleting ${itemType.toLowerCase()}:`, error);

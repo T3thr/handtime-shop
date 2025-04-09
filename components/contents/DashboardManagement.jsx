@@ -18,7 +18,7 @@ import { useProducts, useCategories } from "@/backend/lib/dashboardAction";
 import { toast } from "react-toastify";
 
 // Category Management Component
-export const CategoryManagement = ({ onAddCategory, onEditCategory, onDeleteCategory }) => {
+export const CategoryManagement = ({ onAddCategory, onEditCategory, onDeleteCategory, refetchCategories }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState("name");
   const [sortDirection, setSortDirection] = useState("asc");
@@ -52,7 +52,6 @@ export const CategoryManagement = ({ onAddCategory, onEditCategory, onDeleteCate
       )
       .sort((a, b) => {
         if (sortField === 'priority') {
-          // Sort by priority (main first, then normal)
           const priorityOrder = { main: 0, normal: 1 };
           const aValue = priorityOrder[a.priority || 'normal'];
           const bValue = priorityOrder[b.priority || 'normal'];
@@ -110,7 +109,7 @@ export const CategoryManagement = ({ onAddCategory, onEditCategory, onDeleteCate
                 width={40} 
                 height={40} 
                 className="object-cover" 
-                unoptimized // For Cloudinary URLs
+                unoptimized
               />
             </div>
           ) : (
@@ -181,7 +180,7 @@ export const CategoryManagement = ({ onAddCategory, onEditCategory, onDeleteCate
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            onClick={() => onDeleteCategory(row.slug)}
+            onClick={() => onDeleteCategory(row.slug, refetchCategories)} // Pass refetchCategories
             className="p-2 text-error hover:bg-error/10 rounded-full transition-colors duration-200"
           >
             <FaTrash className="w-4 h-4" />
@@ -232,7 +231,9 @@ export const ManageStore = ({
   onDeleteProduct, 
   onAddCategory, 
   onEditCategory, 
-  onDeleteCategory 
+  onDeleteCategory,
+  refetchProducts, // Added refetchProducts prop
+  refetchCategories // Added refetchCategories prop
 }) => {
   const [activeTab, setActiveTab] = useState("products");
   const [searchTerm, setSearchTerm] = useState("");
@@ -267,7 +268,6 @@ export const ManageStore = ({
     );
   };
   
-  // Filter and sort products
   const sortedAndFilteredProducts = useMemo(() => {
     if (!products) return [];
     
@@ -311,7 +311,7 @@ export const ManageStore = ({
                 width={48} 
                 height={48} 
                 className="object-cover" 
-                unoptimized // For Cloudinary URLs
+                unoptimized
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -393,7 +393,7 @@ export const ManageStore = ({
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            onClick={() => onDeleteProduct(row.slug)}
+            onClick={() => onDeleteProduct(row.slug, refetchProducts)} // Pass refetchProducts
             className="p-2 text-error hover:bg-error/10 rounded-full transition-colors duration-200"
           >
             <FaTrash className="w-4 h-4" />
@@ -463,13 +463,14 @@ export const ManageStore = ({
           onAddCategory={onAddCategory}
           onEditCategory={onEditCategory}
           onDeleteCategory={onDeleteCategory}
+          refetchCategories={refetchCategories} // Pass refetchCategories
         />
       )}
     </div>
   );
 };
 
-// User Management Component
+// User Management Component (unchanged as it doesn't need refetch for now)
 export const UserManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState("name");
@@ -512,7 +513,6 @@ export const UserManagement = () => {
       .sort((a, b) => {
         if (!a[sortField] || !b[sortField]) return 0;
         
-        // Handle nested fields like stats.totalOrders
         if (sortField.includes('.')) {
           const [parent, child] = sortField.split('.');
           const aValue = a[parent] && a[parent][child] ? a[parent][child] : 0;
