@@ -50,7 +50,7 @@ export default function LineCallback() {
       } catch (error) {
         console.error("LINE callback error:", error);
         toast.error(error.message || "Failed to complete LINE login");
-        router.replace("/auth/signin"); // Redirect to sign-in page on failure
+        router.replace("/"); // Redirect to sign-in page on failure
       } finally {
         setIsProcessing(false);
       }
