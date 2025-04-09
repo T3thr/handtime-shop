@@ -34,7 +34,7 @@ export default function LineCallback() {
       } catch (error) {
         console.error("LINE callback error:", error);
         toast.error(error.message || "Failed to complete LINE login");
-        router.push("/auth/signin");
+        router.push("/");
       }
     };
 
