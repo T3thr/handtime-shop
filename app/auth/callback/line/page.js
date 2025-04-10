@@ -13,7 +13,6 @@ export default function LineCallback() {
   useEffect(() => {
     const handleCallback = async () => {
       if (status === "authenticated") {
-        console.log("User already authenticated, redirecting to /");
         router.replace("/");
         return;
       }
@@ -23,18 +22,16 @@ export default function LineCallback() {
 
         try {
           const { default: liff } = await import("@line/liff");
-          console.log("Initializing LIFF in callback with ID:", process.env.NEXT_PUBLIC_LIFF_ID);
-          await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
+          if (!liff.isInited()) {
+            await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
+          }
 
           if (!liff.isLoggedIn()) {
-            const redirectUri = `${window.location.origin}/auth/callback/line`;
-            console.log("User not logged in, redirecting to LINE login with URI:", redirectUri);
-            liff.login({ redirectUri });
+            liff.login({ redirectUri: `${window.location.origin}/auth/callback/line` });
             return;
           }
 
           const profile = await liff.getProfile();
-          console.log("LINE profile retrieved in callback:", profile);
           const res = await signIn("line", {
             redirect: false,
             userId: profile.userId,
@@ -43,16 +40,15 @@ export default function LineCallback() {
           });
 
           if (res?.ok) {
-            console.log("LINE login successful, redirecting to /");
             //toast.success("LINE login successful!");
-            router.replace("/");
+            router.replace("/"); // Redirect to homepage after successful login
           } else {
             throw new Error(res?.error || "Authentication failed");
           }
         } catch (error) {
           console.error("LINE callback error:", error);
-          toast.error("LINE login failed: " + (error.message || "Unknown error"));
-          router.replace("/");
+          //toast.error(error.message || "Failed to complete LINE login");
+          router.replace("/"); // Redirect to sign-in page on failure
         } finally {
           setIsProcessing(false);
         }
