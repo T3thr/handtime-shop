@@ -1,6 +1,6 @@
 // components/layouts/Cart.jsx
 "use client";
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useContext } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Trash2, Plus, Minus, ArrowRight } from "lucide-react";
 import { FaLine } from "react-icons/fa";
@@ -17,33 +17,10 @@ const Cart = ({ isOpen, onClose }) => {
   const { user, lineProfile, status } = useContext(AuthContext);
   const [isLineCheckoutModalOpen, setIsLineCheckoutModalOpen] = useState(false);
   const [stockLimits, setStockLimits] = useState({});
+  const [isCheckingStock, setIsCheckingStock] = useState(false); // New loading state
   const router = useRouter();
 
   const isAuthenticated = status === "authenticated" || !!user || !!lineProfile;
-
-  // Fetch stock limits and adjust cart quantities when cart opens or items change
-  useEffect(() => {
-    const adjustCartQuantities = async () => {
-      const limits = {};
-      for (const item of cartItems) {
-        const stock = await fetchProductStock(item.productId);
-        limits[item.productId] = stock;
-
-        if (stock === 0) {
-          toast.error(`${item.name} is out of stock and has been removed from your cart.`);
-          removeFromCart(item.productId);
-        } else if (item.quantity > stock) {
-          toast.warn(`${item.name} quantity exceeds stock (${stock}). Adjusted to ${stock}.`);
-          updateQuantity(item.productId, stock);
-        }
-      }
-      setStockLimits(limits);
-    };
-
-    if (isOpen && cartItems.length > 0) {
-      adjustCartQuantities();
-    }
-  }, [isOpen, cartItems, fetchProductStock, removeFromCart, updateQuantity]);
 
   const slideVariants = {
     mobile: {
@@ -58,14 +35,43 @@ const Cart = ({ isOpen, onClose }) => {
     },
   };
 
-  const handleProceedToCheckout = (e) => {
+  const handleProceedToCheckout = async (e) => {
     e.preventDefault();
     if (!isAuthenticated) {
       toast.error("Please sign in to proceed to checkout");
       router.push("/auth/signin");
       return;
     }
-    setIsLineCheckoutModalOpen(true);
+
+    // Start stock check
+    setIsCheckingStock(true);
+    const limits = {};
+    let canProceed = true;
+
+    for (const item of cartItems) {
+      const stock = await fetchProductStock(item.productId);
+      limits[item.productId] = stock;
+
+      if (stock === 0) {
+        toast.error(`${item.name} is out of stock and has been removed from your cart.`);
+        removeFromCart(item.productId);
+        canProceed = false;
+      } else if (item.quantity > stock) {
+        toast.warn(`${item.name} quantity exceeds stock (${stock}). Adjusted to ${stock}.`);
+        updateQuantity(item.productId, stock);
+        canProceed = false; // Prevent proceeding until quantities are adjusted
+      }
+    }
+
+    setStockLimits(limits);
+    setIsCheckingStock(false);
+
+    // Only open modal if all quantities are valid
+    if (canProceed && cartItems.length > 0) {
+      setIsLineCheckoutModalOpen(true);
+    } else if (cartItems.length === 0) {
+      toast.error("Your cart is empty after stock adjustments.");
+    }
   };
 
   const handleCloseLineCheckoutModal = () => {
@@ -103,6 +109,8 @@ const Cart = ({ isOpen, onClose }) => {
                 onCheckout={handleProceedToCheckout}
                 isMobile={true}
                 isAuthenticated={isAuthenticated}
+                isCheckingStock={isCheckingStock}
+                isLineCheckoutModalOpen={isLineCheckoutModalOpen}
               />
             </motion.div>
             <motion.div
@@ -124,6 +132,8 @@ const Cart = ({ isOpen, onClose }) => {
                 onCheckout={handleProceedToCheckout}
                 isMobile={false}
                 isAuthenticated={isAuthenticated}
+                isCheckingStock={isCheckingStock}
+                isLineCheckoutModalOpen={isLineCheckoutModalOpen}
               />
             </motion.div>
           </>
@@ -145,6 +155,8 @@ const CartContent = ({
   onCheckout,
   isMobile,
   isAuthenticated,
+  isCheckingStock,
+  isLineCheckoutModalOpen,
 }) => {
   return (
     <div className="flex flex-col h-full bg-surface-card transition-colors duration-300">
@@ -213,7 +225,12 @@ const CartContent = ({
         <div className="flex-1 flex flex-col items-center justify-center p-4 text-center">
           <div className="w-16 h-16 bg-background-secondary rounded-full flex items-center justify-center mb-4">
             <svg className="w-8 h-8 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+              />
             </svg>
           </div>
           <h3 className="text-lg font-medium text-text-primary mb-2">Your cart is empty</h3>
@@ -236,11 +253,44 @@ const CartContent = ({
             </div>
             <button
               onClick={onCheckout}
-              className="w-full py-3 px-4 bg-[#06C755] text-white rounded-lg hover:bg-[#05b54d] transition-colors duration-200 flex items-center justify-center space-x-2"
+              disabled={isCheckingStock || isLineCheckoutModalOpen}
+              className={`w-full py-3 px-4 bg-[#06C755] text-white rounded-lg flex items-center justify-center space-x-2 transition-colors duration-200 ${
+                isCheckingStock || isLineCheckoutModalOpen
+                  ? "opacity-70 cursor-not-allowed"
+                  : "hover:bg-[#05b54d]"
+              }`}
             >
-              <FaLine className="h-5 w-5" />
-              <span>Order via LINE</span>
-              <ArrowRight className="h-4 w-4" />
+              {isCheckingStock ? (
+                <>
+                  <svg
+                    className="animate-spin h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  <span>Checking Stock...</span>
+                </>
+              ) : (
+                <>
+                  <FaLine className="h-5 w-5" />
+                  <span>Order via LINE</span>
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </button>
           </div>
         </div>

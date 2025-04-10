@@ -6,7 +6,7 @@ import ChangeTheme from "@/components/layouts/ChangeTheme";
 import { cookies } from "next/headers";
 import { GlobalProvider } from "./GlobalProvider";
 import Head from "next/head";
-import CustomToast from './CustomToast';
+import CustomToast from "./CustomToast";
 
 const inter = Inter({ subsets: ["latin"] });
 
