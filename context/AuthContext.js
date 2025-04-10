@@ -16,26 +16,27 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // Initialize LIFF and handle LINE login
   useEffect(() => {
     const initializeLiff = async () => {
-      if (!process.env.NEXT_PUBLIC_LIFF_ID) {
-        console.warn("LIFF ID is not defined in environment variables");
-        return;
-      }
-
       try {
+        if (!process.env.NEXT_PUBLIC_LIFF_ID) {
+          console.warn("LIFF ID is not defined in environment variables");
+          return;
+        }
+
         const { default: liff } = await import("@line/liff");
         await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
 
-        if (liff.isLoggedIn() && status === "unauthenticated") {
+        if (liff.isLoggedIn()) {
           const profile = await liff.getProfile();
           setLineProfile(profile);
-          await lineSignIn(profile);
+          if (status === "unauthenticated") {
+            await registerLineUser(profile);
+            await lineSignIn(profile);
+          }
         }
       } catch (error) {
         console.error("LIFF initialization error:", error);
-        toast.error("Failed to initialize LINE login");
       }
     };
 
@@ -44,7 +45,6 @@ export const AuthProvider = ({ children }) => {
     }
   }, [status]);
 
-  // Sync user state with session
   useEffect(() => {
     if (status === "authenticated" && session?.user) {
       setUser(session.user);
@@ -68,20 +68,19 @@ export const AuthProvider = ({ children }) => {
         userId: profile.userId,
         displayName: profile.displayName,
         pictureUrl: profile.pictureUrl,
+        idToken: profile.idToken || null,
       });
 
       if (res.data.success) {
-        const registeredUser = {
+        setUser({
           id: res.data.user.id,
           name: res.data.user.name,
           lineId: res.data.user.lineId,
           avatar: res.data.user.avatar,
           role: res.data.user.role,
-        };
-        setUser(registeredUser);
-        return { success: true, user: registeredUser };
+        });
+        return { success: true };
       }
-      return { success: false, message: "Registration failed" };
     } catch (error) {
       console.error("LINE registration error:", error);
       toast.error(error.response?.data?.error || "Failed to register LINE user");
@@ -131,14 +130,15 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (res?.ok) {
-        await update(); // Force session update
+        await update();
         toast.success("Admin login successful!");
         return { success: true };
       }
+
       return { success: false, message: "Unknown error occurred" };
     } catch (error) {
-      toast.error("Admin signin failed");
-      return { success: false, message: "Admin signin failed" };
+      toast.error("Signin failed");
+      return { success: false, message: "Signin failed" };
     } finally {
       setLoading(false);
     }
@@ -164,10 +164,11 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (res?.ok) {
-        await update(); // Force session update
+        await update();
         toast.success("LINE login successful!");
         return { success: true };
       }
+
       return { success: false, message: "Unknown error occurred" };
     } catch (error) {
       console.error("LINE signin error:", error);

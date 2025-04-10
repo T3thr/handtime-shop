@@ -13,6 +13,7 @@ export default function LineCallback() {
   useEffect(() => {
     const handleCallback = async () => {
       if (status === "authenticated") {
+        console.log("User already authenticated, redirecting to /");
         router.replace("/");
         return;
       }
@@ -22,16 +23,18 @@ export default function LineCallback() {
 
         try {
           const { default: liff } = await import("@line/liff");
-          if (!liff.isInited()) {
-            await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
-          }
+          console.log("Initializing LIFF in callback with ID:", process.env.NEXT_PUBLIC_LIFF_ID);
+          await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
 
           if (!liff.isLoggedIn()) {
-            liff.login({ redirectUri: `${window.location.origin}/auth/callback/line` });
+            const redirectUri = `${window.location.origin}/auth/callback/line`;
+            console.log("User not logged in, redirecting to LINE login with URI:", redirectUri);
+            liff.login({ redirectUri });
             return;
           }
 
           const profile = await liff.getProfile();
+          console.log("LINE profile retrieved in callback:", profile);
           const res = await signIn("line", {
             redirect: false,
             userId: profile.userId,
@@ -40,15 +43,16 @@ export default function LineCallback() {
           });
 
           if (res?.ok) {
+            console.log("LINE login successful, redirecting to /");
             //toast.success("LINE login successful!");
-            router.replace("/"); // Redirect to homepage after successful login
+            router.replace("/");
           } else {
             throw new Error(res?.error || "Authentication failed");
           }
         } catch (error) {
           console.error("LINE callback error:", error);
-          //toast.error(error.message || "Failed to complete LINE login");
-          router.replace("/"); // Redirect to sign-in page on failure
+          toast.error("LINE login failed: " + (error.message || "Unknown error"));
+          router.replace("/");
         } finally {
           setIsProcessing(false);
         }

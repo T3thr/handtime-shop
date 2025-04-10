@@ -125,7 +125,7 @@ export const options = {
     },
   },
   pages: {
-    signIn: "/auth/signin",
+    signIn: process.env.NEXT_PUBLIC_LIFF_URL,
     error: "/auth/error",
   },
   secret: process.env.NEXTAUTH_SECRET,

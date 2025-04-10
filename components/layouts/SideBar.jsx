@@ -46,16 +46,18 @@ export default function SideBar() {
     setIsLineLoading(true);
     try {
       const { default: liff } = await import("@line/liff");
-      if (!liff.isInited()) {
-        await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
-      }
+      console.log("Initializing LIFF with ID:", process.env.NEXT_PUBLIC_LIFF_ID);
+      await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
 
       if (!liff.isLoggedIn()) {
-        liff.login({ redirectUri: `${window.location.origin}/auth/callback/line` });
+        const redirectUri = `${window.location.origin}/auth/callback/line`;
+        console.log("Redirecting to LINE login with URI:", redirectUri);
+        liff.login({ redirectUri });
         return;
       }
 
       const profile = await liff.getProfile();
+      console.log("LINE profile retrieved:", profile);
       const result = await lineSignIn(profile);
 
       if (!result.success) {
@@ -64,7 +66,7 @@ export default function SideBar() {
       closeSidebar();
     } catch (error) {
       console.error("LINE login error:", error);
-      toast.error("LINE login failed. Please try again.");
+      toast.error("LINE login failed: " + (error.message || "Unknown error"));
     } finally {
       setIsLineLoading(false);
     }
