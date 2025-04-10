@@ -1,29 +1,32 @@
+// components/contents/EnhancedSidebar.jsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useContext, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  FaBars, 
-  FaTimes, 
-  FaChevronLeft, 
-  FaChevronRight, 
-  FaUser, 
-  FaShoppingBag, 
-  FaHeart, 
-  FaBox, 
-  FaCog, 
-  FaStore, 
-  FaUsers, 
+import {
+  FaBars,
+  FaTimes,
+  FaChevronLeft,
+  FaChevronRight,
+  FaUser,
+  FaShoppingBag,
+  FaHeart,
+  FaBox,
+  FaCog,
+  FaStore,
+  FaUsers,
   FaClipboardList,
-  FaSignOutAlt,
+  FaHome,
   FaMoon,
-  FaSun
+  FaSun,
 } from "react-icons/fa";
+import { MdAdminPanelSettings } from "react-icons/md"; // New admin icon
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import Image from "next/image";
 import { useTheme } from "@/context/Theme";
 import { useSidebar } from "@/context/DashboardSidebarContext";
+import AuthContext from "@/context/AuthContext";
 import { Shield, Copy, Eye, EyeOff } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -32,15 +35,17 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
   const { theme, toggleTheme } = useTheme();
   const { isOpen, toggleSidebar, isCollapsed, toggleCollapse } = useSidebar();
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
-  const [showUserId, setShowUserId] = useState(false); // Added for LINE ID toggle
-  
-  const handleSignOut = async () => {
-    await signOut({ redirect: false });
-    router.push('/');
+  const [showUserId, setShowUserId] = useState(false);
+  const { user, lineProfile } = useContext(AuthContext);
+  const adminMenuRef = useRef(null); // Ref for admin dropdown
+
+  const handleReturn = () => {
+    router.push("/");
+    if (window.innerWidth < 1024) toggleSidebar();
   };
-  
-  const isAdmin = session?.user?.role === 'admin';
-  
+
+  const isAdmin = user?.role === "admin" || session?.user?.role === "admin";
+
   const userNavItems = [
     { id: "overview", label: "Overview", icon: FaUser },
     { id: "orders", label: "Orders", icon: FaShoppingBag },
@@ -48,105 +53,106 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
     { id: "shipments", label: "Shipments", icon: FaBox },
     { id: "settings", label: "Settings", icon: FaCog },
   ];
-  
+
   const adminNavItems = [
     { id: "store", label: "Store", icon: FaStore },
     { id: "users", label: "Users", icon: FaUsers },
     { id: "allOrders", label: "All Orders", icon: FaClipboardList },
   ];
-  
+
   // Sidebar animation variants
   const sidebarVariants = {
-    open: { 
+    open: {
       x: 0,
       width: isCollapsed ? "80px" : "280px",
-      transition: { 
-        type: "spring", 
-        stiffness: 400, 
-        damping: 28 
-      }
+      transition: { type: "spring", stiffness: 400, damping: 28 },
     },
-    closed: { 
+    closed: {
       x: isCollapsed ? "-80px" : "-280px",
       width: isCollapsed ? "80px" : "280px",
-      transition: { 
-        type: "spring", 
-        stiffness: 400, 
-        damping: 28 
-      }
-    }
+      transition: { type: "spring", stiffness: 400, damping: 28 },
+    },
   };
-  
+
   // Navigation item hover animation
   const navItemVariants = {
-    hover: { 
-      x: 5, 
-      transition: { duration: 0.2 } 
-    }
+    hover: { x: 5, transition: { duration: 0.2 } },
   };
 
   // Active indicator animation
   const activeIndicatorVariants = {
     inactive: { opacity: 0, scale: 0.5 },
-    active: { 
-      opacity: 1, 
+    active: {
+      opacity: 1,
       scale: 1,
-      transition: { 
-        type: "spring", 
-        stiffness: 500, 
-        damping: 30 
-      }
-    }
+      transition: { type: "spring", stiffness: 500, damping: 30 },
+    },
   };
 
-  // Avatar rendering function from SideBar.jsx
+  // Handle click outside to close admin menu
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (adminMenuRef.current && !adminMenuRef.current.contains(event.target)) {
+        setIsAdminMenuOpen(false);
+      }
+    };
+
+    if (isAdminMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isAdminMenuOpen]);
+
   const getUserAvatar = () => {
-    if (session?.user?.role === "admin") {
+    if (user?.role === "admin") {
       return (
-        <div className={`h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center ${isCollapsed ? "w-8 h-8" : "w-10 h-10"}`}>
+        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
           <Shield className="h-5 w-5 text-blue-600" />
         </div>
       );
     }
-    if (session?.user?.image) {
+    if (user?.image || lineProfile?.pictureUrl || session?.user?.image) {
       return (
         <Image
-          src={session.user.image}
-          alt={session.user.name || "User"}
-          fill
-          className="object-cover rounded-full"
+          src={user?.image || lineProfile?.pictureUrl || session?.user?.image}
+          alt="Profile"
+          width={40}
+          height={40}
+          className="rounded-full object-cover"
         />
       );
     }
     return (
-      <div className={`h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center ${isCollapsed ? "w-8 h-8" : "w-10 h-10"}`}>
+      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
         <FaUser className="h-6 w-6 text-primary" />
       </div>
     );
   };
 
-  // Role badge rendering function from SideBar.jsx
   const getUserRoleBadge = () => {
-    if (!session?.user?.role) return null;
+    const role = user?.role || session?.user?.role;
+    if (!role) return null;
     return (
       <span
         className={`text-xs px-2 py-1 rounded-full ${
-          session.user.role === "admin" ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"
+          role === "admin" ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"
         }`}
       >
-        {session.user.role}
+        {role}
       </span>
     );
   };
 
-  // User info rendering function adapted from SideBar.jsx
   const renderUserInfo = () => {
-    if (session?.user?.email) {
-      return session.user.email;
-    } else if (session?.user?.lineId) {
+    if (user?.email || session?.user?.email) {
+      return user?.email || session?.user?.email;
+    } else if (user?.lineId || lineProfile?.userId) {
       return (
         <div className="flex flex-col space-y-2">
-          <span className="truncate">{session.user.name || "LINE User"}</span>
+          <span className="truncate">{user?.name || lineProfile?.displayName || "LINE User"}</span>
           <div className="flex items-center space-x-1">
             <button
               onClick={() => setShowUserId(!showUserId)}
@@ -158,12 +164,15 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
             {showUserId && (
               <div className="flex items-center space-x-1 max-w-24 overflow-hidden">
                 <span className="text-xs bg-container px-2 py-1 rounded truncate">
-                  {session.user.lineId}
+                  {user?.lineId || lineProfile?.userId}
                 </span>
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(session.user.lineId);
-                    toast.success("User ID copied to clipboard");
+                    const userId = user?.lineId || lineProfile?.userId;
+                    if (userId) {
+                      navigator.clipboard.writeText(userId);
+                      toast.success("User ID copied to clipboard");
+                    }
                   }}
                   className="p-1 rounded hover:bg-container flex-shrink-0"
                   aria-label="Copy User ID"
@@ -193,7 +202,7 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
           />
         )}
       </AnimatePresence>
-      
+
       {/* Sidebar */}
       <motion.div
         variants={sidebarVariants}
@@ -207,13 +216,17 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
           marginTop: "16px",
           marginBottom: "16px",
           height: "calc(100% - 32px)",
-          background: "var(--surface-card)"
+          background: "var(--surface-card)",
         }}
       >
         {/* Sidebar Header with Logo */}
-        <div className={`p-4 border-b border-border-primary flex ${isCollapsed ? "justify-center" : "justify-between"} items-center`}>
+        <div
+          className={`p-4 border-b border-border-primary flex ${
+            isCollapsed ? "justify-center" : "justify-between"
+          } items-center`}
+        >
           {!isCollapsed && (
-            <motion.div 
+            <motion.div
               className="flex items-center"
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
@@ -221,27 +234,23 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
             >
               <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-text-inverted relative overflow-hidden">
                 <span className="font-bold z-10">HT</span>
-                <motion.div 
+                <motion.div
                   className="absolute inset-0 bg-primary"
-                  animate={{ 
+                  animate={{
                     background: [
-                      'var(--primary)', 
-                      'var(--primary-light)', 
-                      'var(--primary-dark)', 
-                      'var(--primary)'
-                    ]
+                      "var(--primary)",
+                      "var(--primary-light)",
+                      "var(--primary-dark)",
+                      "var(--primary)",
+                    ],
                   }}
-                  transition={{ 
-                    duration: 8, 
-                    repeat: Infinity, 
-                    ease: "linear" 
-                  }}
+                  transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
                 />
               </div>
               <h2 className="text-lg font-bold text-text-primary ml-2">Dashboard</h2>
             </motion.div>
           )}
-          
+
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
@@ -251,31 +260,33 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
             {isCollapsed ? <FaChevronRight /> : <FaChevronLeft />}
           </motion.button>
         </div>
-        
+
         {/* User Info */}
-        <motion.div 
+        <motion.div
           className={`p-4 border-b border-border-primary ${isCollapsed ? "text-center" : ""}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
         >
           <div className={`flex ${isCollapsed ? "justify-center" : "items-center"}`}>
-            <motion.div 
-              className="relative rounded-full overflow-hidden"
+            <motion.div
+              className="relative"
               whileHover={{ scale: 1.1 }}
               transition={{ type: "spring", stiffness: 400, damping: 10 }}
             >
               {getUserAvatar()}
             </motion.div>
             {!isCollapsed && (
-              <motion.div 
+              <motion.div
                 className="ml-3 overflow-hidden"
                 initial={{ x: -10, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 transition={{ delay: 0.3 }}
               >
                 <div className="flex items-center space-x-2">
-                  <h2 className="font-medium text-text-primary truncate">{session?.user?.name || "Guest"}</h2>
+                  <h2 className="font-medium text-text-primary truncate">
+                    {user?.name || lineProfile?.displayName || session?.user?.name || "Guest"}
+                  </h2>
                   {getUserRoleBadge()}
                 </div>
                 <p className="text-sm text-text-secondary">{renderUserInfo()}</p>
@@ -283,31 +294,28 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
             )}
           </div>
         </motion.div>
-        
+
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto py-4">
           <nav>
-            <motion.ul 
+            <motion.ul
               className="space-y-1 px-2"
               initial="hidden"
               animate="visible"
               variants={{
                 hidden: { opacity: 0 },
-                visible: { 
+                visible: {
                   opacity: 1,
-                  transition: { 
-                    staggerChildren: 0.07,
-                    delayChildren: 0.2
-                  }
-                }
+                  transition: { staggerChildren: 0.07, delayChildren: 0.2 },
+                },
               }}
             >
               {userNavItems.map((item) => (
-                <motion.li 
+                <motion.li
                   key={item.id}
                   variants={{
                     hidden: { y: 20, opacity: 0 },
-                    visible: { y: 0, opacity: 1 }
+                    visible: { y: 0, opacity: 1 },
                   }}
                 >
                   <motion.div className="relative">
@@ -329,7 +337,7 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                       <item.icon className={`${isCollapsed ? "w-5 h-5" : "w-5 h-5 mr-3"}`} />
                       {!isCollapsed && <span>{item.label}</span>}
                     </motion.button>
-                    
+
                     {!isCollapsed && activeSection === item.id && (
                       <motion.div
                         className="absolute left-0 top-1/2 h-6 w-1 bg-primary-light rounded-r-full transform -translate-y-1/2"
@@ -341,14 +349,14 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                   </motion.div>
                 </motion.li>
               ))}
-              
+
               {isAdmin && (
                 <>
-                  <motion.li 
+                  <motion.li
                     className="pt-4"
                     variants={{
                       hidden: { opacity: 0 },
-                      visible: { opacity: 1 }
+                      visible: { opacity: 1 },
                     }}
                   >
                     {isCollapsed ? (
@@ -361,12 +369,12 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                       </div>
                     )}
                   </motion.li>
-                  
+
                   {isCollapsed ? (
                     <motion.li
                       variants={{
                         hidden: { y: 20, opacity: 0 },
-                        visible: { y: 0, opacity: 1 }
+                        visible: { y: 0, opacity: 1 },
                       }}
                     >
                       <motion.button
@@ -375,19 +383,20 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                         onClick={() => setIsAdminMenuOpen(!isAdminMenuOpen)}
                         className="w-full flex justify-center px-4 py-3 rounded-lg text-text-primary hover:bg-background-secondary hover:text-primary transition-all duration-200"
                       >
-                        <FaCog className="w-5 h-5" />
+                        <MdAdminPanelSettings className="w-7 h-7" /> 
                       </motion.button>
-                      
+
                       {/* Dropdown for collapsed mode */}
                       <AnimatePresence>
                         {isAdminMenuOpen && (
                           <motion.div
+                            ref={adminMenuRef}
                             initial={{ opacity: 0, scale: 0.95, y: -5 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: -5 }}
                             className="absolute left-20 z-50 bg-surface-card rounded-lg shadow-lg border border-border-primary py-2 min-w-[180px]"
                             style={{
-                              background: "var(--surface-card)"
+                              background: "var(--surface-card)",
                             }}
                           >
                             {adminNavItems.map((item) => (
@@ -415,11 +424,11 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                     </motion.li>
                   ) : (
                     adminNavItems.map((item) => (
-                      <motion.li 
+                      <motion.li
                         key={item.id}
                         variants={{
                           hidden: { y: 20, opacity: 0 },
-                          visible: { y: 0, opacity: 1 }
+                          visible: { y: 0, opacity: 1 },
                         }}
                       >
                         <motion.div className="relative">
@@ -439,7 +448,7 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                             <item.icon className="w-5 h-5 mr-3" />
                             <span>{item.label}</span>
                           </motion.button>
-                          
+
                           {activeSection === item.id && (
                             <motion.div
                               className="absolute left-0 top-1/2 h-6 w-1 bg-primary-light rounded-r-full transform -translate-y-1/2"
@@ -457,65 +466,71 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
             </motion.ul>
           </nav>
         </div>
-        
+
         {/* Footer */}
-        <motion.div 
+        <motion.div
           className="p-4 border-t border-border-primary"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
         >
           <div className="flex flex-col space-y-2">
-            <motion.button
+          <motion.button
               whileHover="hover"
               variants={navItemVariants}
               onClick={toggleTheme}
-              className={`flex items-center ${
-                isCollapsed ? "justify-center" : ""
-              } px-4 py-2 rounded-lg text-text-primary hover:bg-background-secondary hover:text-primary transition-all duration-200`}
+              className={`flex items-center ${isCollapsed ? "justify-center" : ""} px-4 py-2 rounded-lg text-text-primary hover:bg-background-secondary hover:text-primary transition-all duration-200`}
             >
               {theme === "dark" ? (
                 <motion.div
                   whileHover={{ rotate: 90 }}
                   transition={{ type: "spring", stiffness: 300 }}
                 >
-                  <FaSun className={`${isCollapsed ? "w-5 h-5" : "w-5 h-5 mr-3"}`} />
+                  <FaMoon
+                    className={`${
+                      isCollapsed ? "w-5 h-5" : "w-5 h-5 mr-3"
+                    } ${!isCollapsed ? "fill-text-primary" : ""}`}
+                  />
                 </motion.div>
               ) : (
                 <motion.div
                   whileHover={{ rotate: -90 }}
                   transition={{ type: "spring", stiffness: 300 }}
                 >
-                  <FaMoon className={`${isCollapsed ? "w-5 h-5" : "w-5 h-5 mr-3"}`} />
+                  <FaSun
+                    className={`${
+                      isCollapsed ? "w-5 h-5 fill-yellow-500" : "w-5 h-5 mr-3"
+                    } ${!isCollapsed ? "fill-yellow-500" : ""}`}
+                  />
                 </motion.div>
               )}
-              {!isCollapsed && <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>}
+              {!isCollapsed && <span>{theme === "dark" ? "Use Light Mode" : "Use Dark Mode"}</span>}
             </motion.button>
-            
+
             <motion.button
               whileHover="hover"
               variants={navItemVariants}
-              onClick={handleSignOut}
+              onClick={handleReturn}
               className={`flex items-center ${
                 isCollapsed ? "justify-center" : ""
-              } px-4 py-2 rounded-lg text-error hover:bg-error/10 transition-all duration-200`}
+              } px-4 py-2 rounded-lg text-primary hover:bg-primary/10 transition-all duration-200`}
             >
-              <FaSignOutAlt className={`${isCollapsed ? "w-5 h-5" : "w-5 h-5 mr-3"}`} />
-              {!isCollapsed && <span>Sign Out</span>}
+              <FaHome className={`${isCollapsed ? "w-5 h-5" : "w-5 h-5 mr-3"}`} />
+              {!isCollapsed && <span>Return Home</span>}
             </motion.button>
           </div>
         </motion.div>
       </motion.div>
-      
+
       {/* Mobile Toggle Button */}
       <motion.button
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={toggleSidebar}
-        className="fixed bottom-6 left-6 z-30 lg:hidden p-4 rounded-full bg-primary text-text-inverted shadow-lg pulse-soft"
+        className="fixed top-6 left-6 z-30 lg:hidden p-4 rounded-full bg-primary text-text-inverted shadow-lg pulse-soft"
         style={{
           background: "var(--primary)",
-          boxShadow: "0 4px 12px rgba(15, 118, 110, 0.3)"
+          boxShadow: "0 4px 12px rgba(15, 118, 110, 0.3)",
         }}
       >
         <AnimatePresence mode="wait">
@@ -543,5 +558,5 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
         </AnimatePresence>
       </motion.button>
     </>
-  )
-}
+  );
+};

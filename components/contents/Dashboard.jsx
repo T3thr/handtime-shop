@@ -117,14 +117,13 @@ export default function Dashboard({ session }) {
       };
       
       await addToCart(cartItem);
-      toast.success(`${product.name} added to cart!`);
+      //toast.success(`${product.name} added to cart!`);
     } catch (error) {
       console.error("Failed to add to cart:", error);
       toast.error("Failed to add to cart");
     }
   };
   
-  // Animation variants
   const contentVariants = {
     hidden: { opacity: 0 },
     visible: { 
@@ -137,11 +136,12 @@ export default function Dashboard({ session }) {
     }
   };
   
-  // Render the appropriate section based on active section
+  const setActiveSection = (section) => setState({ activeSection: section });
+
   const renderSection = () => {
     switch (state.activeSection) {
       case "overview":
-        return <OverviewSection session={session} />;
+        return <OverviewSection session={session} setActiveSection={setActiveSection} />;
       case "orders":
         return <OrdersSection session={session} />;
       case "wishlist":
@@ -170,7 +170,7 @@ export default function Dashboard({ session }) {
           </div>
         );
       default:
-        return <OverviewSection session={session} />;
+        return <OverviewSection session={session} setActiveSection={setActiveSection} />;
     }
   };
   
@@ -178,7 +178,7 @@ export default function Dashboard({ session }) {
     <div className="min-h-screen bg-background">
       <Sidebar
         activeSection={state.activeSection}
-        setActiveSection={(section) => setState({ activeSection: section })}
+        setActiveSection={setActiveSection}
         session={session}
       />
       
@@ -201,7 +201,6 @@ export default function Dashboard({ session }) {
         </div>
       </main>
       
-      {/* Modals */}
       <ProductFormModal
         isOpen={isProductModalOpen}
         onClose={() => setIsProductModalOpen(false)}

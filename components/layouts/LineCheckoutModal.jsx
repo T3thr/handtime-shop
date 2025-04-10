@@ -11,7 +11,7 @@ import liff from "@line/liff";
 
 const LineCheckoutModal = ({ isOpen, onClose }) => {
   const { cartItems, getCartSummary, clearCart } = useCart();
-  const { lineProfile } = useContext(AuthContext);
+  const { user, lineProfile } = useContext(AuthContext); // Added user from AuthContext
   const { subtotal, totalItems } = getCartSummary();
   const [isProcessing, setIsProcessing] = useState(false);
   const [showThankYou, setShowThankYou] = useState(false);
@@ -40,7 +40,9 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
   }, [isOpen, LIFF_ID, isLiffInitialized]);
 
   const formatOrderMessage = useCallback(() => {
-    let message = `🛒 New Order from ${lineProfile?.displayName || "Customer"} 🛒\n`;
+    // Use user.name if available, otherwise fall back to lineProfile.displayName
+    const userName = user?.name || lineProfile?.displayName || "Customer";
+    let message = `🛒 New Order from ${userName} 🛒\n`;
     if (orderId) message += `Order ID: ${orderId}\n\n`;
     cartItems.forEach((item, index) => {
       message += `${index + 1}. ${item.name}\n`;
@@ -51,7 +53,7 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
     message += `Total Items: ${totalItems}\n`;
     message += "\nPlease reply with your shipping details to complete the order.";
     return message;
-  }, [cartItems, subtotal, totalItems, lineProfile, orderId]);
+  }, [cartItems, subtotal, totalItems, user, lineProfile, orderId]);
 
   const copyOrderToClipboard = useCallback(() => {
     const orderMessage = formatOrderMessage();
@@ -78,12 +80,13 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
       }
 
       const orderMessage = formatOrderMessage();
+      const userName = user?.name || lineProfile?.displayName || "Customer"; // Ensure userName is included
 
       console.log("Sending order to /api/orders");
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cartItems, totalAmount: subtotal, message: orderMessage }),
+        body: JSON.stringify({ cartItems, totalAmount: subtotal, message: orderMessage, userName }),
       });
 
       let data;
@@ -132,7 +135,7 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
     } finally {
       setIsProcessing(false);
     }
-  }, [formatOrderMessage, cartItems, subtotal, clearCart, onClose, LINE_OA_URL, LIFF_ID, isLiffInitialized]);
+  }, [formatOrderMessage, cartItems, subtotal, clearCart, onClose, LINE_OA_URL, LIFF_ID, isLiffInitialized, user, lineProfile]);
 
   return (
     <AnimatePresence>

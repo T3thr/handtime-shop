@@ -27,11 +27,11 @@ export async function POST(request) {
       return NextResponse.json({ error: "Invalid JSON in request body" }, { status: 400 });
     }
 
-    const { cartItems, totalAmount, message } = body;
+    const { cartItems, totalAmount, message, userName } = body;
 
-    if (!cartItems || cartItems.length === 0 || !totalAmount) {
+    if (!cartItems || cartItems.length === 0 || !totalAmount || !userName) {
       console.log("Invalid order data received:", body);
-      return NextResponse.json({ error: "Invalid order data" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid order data: Missing required fields" }, { status: 400 });
     }
 
     const userQuery = { $or: [{ email: session.user.email }, { lineId: session.user.lineId }] };
@@ -60,9 +60,10 @@ export async function POST(request) {
       }
     }
 
-    // Create new order
+    // Create new order with userName
     const order = new Order({
       userId: user._id,
+      userName, // Add userName to the order
       items: cartItems.map((item) => ({
         productId: item.productId,
         name: item.name,
@@ -73,7 +74,7 @@ export async function POST(request) {
       })),
       totalAmount,
       paymentMethod: "line",
-      message, // Store the LINE message
+      message,
     });
 
     await order.save();
@@ -98,19 +99,39 @@ export async function POST(request) {
     );
   }
 }
-export async function GET() {
-  const session = await getServerSession(options);
-  if (!session || !session.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
+export async function GET(req) {
   try {
     await dbConnect();
+    const session = await getServerSession(options);
+
+    if (!session || !session.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const page = parseInt(searchParams.get("page")) || 1;
+    const limit = parseInt(searchParams.get("limit")) || 10;
+
+    const skip = (page - 1) * limit;
+    const total = await Order.countDocuments({ userId: session.user.id });
     const orders = await Order.find({ userId: session.user.id })
-      .select("orderId totalAmount status createdAt updatedAt")
-      .lean();
-    return NextResponse.json(orders);
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate("items.productId", "name price image");
+
+    const totalPages = Math.ceil(total / limit);
+
+    return NextResponse.json({
+      orders,
+      page,
+      limit,
+      total,
+      totalPages,
+    }, { status: 200 });
   } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch orders" }, { status: 500 });
+    console.error("Error fetching orders:", error);
+    return NextResponse.json({ error: "Failed to fetch orders", details: error.message }, { status: 500 });
   }
 }

@@ -1,8 +1,8 @@
-// components/layouts/Cart.jsx
 "use client";
+
 import React, { useState, useContext, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trash2, Plus, Minus, ArrowRight } from "lucide-react";
+import { X, Trash2, Plus, Minus, ArrowRight, ShoppingCart } from "lucide-react";
 import { FaLine } from "react-icons/fa";
 import { useCart } from "@/context/CartContext";
 import Image from "next/image";
@@ -11,7 +11,8 @@ import AuthContext from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 
-const Cart = ({ isOpen, onClose }) => {
+const CartWrapper = ({ children }) => {
+  const [isCartOpen, setIsCartOpen] = useState(false);
   const { cartItems, updateQuantity, removeFromCart, getCartSummary, fetchProductStock } = useCart();
   const { subtotal, totalItems } = getCartSummary();
   const { user, lineProfile, status } = useContext(AuthContext);
@@ -40,10 +41,10 @@ const Cart = ({ isOpen, onClose }) => {
       setStockLimits(limits);
     };
 
-    if (isOpen && cartItems.length > 0) {
+    if (isCartOpen && cartItems.length > 0) {
       adjustCartQuantities();
     }
-  }, [isOpen, cartItems, fetchProductStock, removeFromCart, updateQuantity]);
+  }, [isCartOpen, cartItems, fetchProductStock, removeFromCart, updateQuantity]);
 
   const slideVariants = {
     mobile: {
@@ -74,14 +75,33 @@ const Cart = ({ isOpen, onClose }) => {
 
   return (
     <>
+      {/* Floating Cart Button */}
+      <motion.button
+        onClick={() => setIsCartOpen(true)}
+        className="fixed top-4 right-4 z-50 p-3 bg-primary text-text-inverted rounded-full shadow-lg hover:bg-primary-dark transition-colors duration-200 flex items-center space-x-2"
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+      >
+        <ShoppingCart className="h-5 w-5" />
+        {totalItems > 0 && (
+          <span className="absolute -top-1 -right-1 bg-error text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+            {totalItems}
+          </span>
+        )}
+      </motion.button>
+
+      {/* Render Children */}
+      {children}
+
+      {/* Cart Modal */}
       <AnimatePresence>
-        {isOpen && (
+        {isCartOpen && (
           <>
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={onClose}
+              onClick={() => setIsCartOpen(false)}
               className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
             />
             <motion.div
@@ -99,7 +119,7 @@ const Cart = ({ isOpen, onClose }) => {
                 subtotal={subtotal}
                 totalItems={totalItems}
                 stockLimits={stockLimits}
-                onClose={onClose}
+                onClose={() => setIsCartOpen(false)}
                 onCheckout={handleProceedToCheckout}
                 isMobile={true}
                 isAuthenticated={isAuthenticated}
@@ -120,7 +140,7 @@ const Cart = ({ isOpen, onClose }) => {
                 subtotal={subtotal}
                 totalItems={totalItems}
                 stockLimits={stockLimits}
-                onClose={onClose}
+                onClose={() => setIsCartOpen(false)}
                 onCheckout={handleProceedToCheckout}
                 isMobile={false}
                 isAuthenticated={isAuthenticated}
@@ -129,6 +149,8 @@ const Cart = ({ isOpen, onClose }) => {
           </>
         )}
       </AnimatePresence>
+
+      {/* Line Checkout Modal */}
       <LineCheckoutModal isOpen={isLineCheckoutModalOpen} onClose={handleCloseLineCheckoutModal} />
     </>
   );
@@ -249,4 +271,4 @@ const CartContent = ({
   );
 };
 
-export default Cart;
+export default CartWrapper;

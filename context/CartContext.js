@@ -11,7 +11,7 @@ export function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [productCache, setProductCache] = useState({}); // Cache for full product details
+  const [productCache, setProductCache] = useState({});
 
   const isAuthenticated = status === "authenticated" || !!user || !!lineProfile;
 
@@ -29,16 +29,15 @@ export function CartProvider({ children }) {
       setCartItems(cart || []);
     } catch (error) {
       console.error("Error fetching cart:", error);
-      //toast.error("Failed to load your cart");
+      // toast.error("Failed to load your cart");
     } finally {
       setLoading(false);
     }
   }, [isAuthenticated]);
 
-  // Fetch full product details and cache them
   const fetchProductDetails = useCallback(async (productId) => {
     if (productCache[productId]) {
-      return productCache[productId]; // Return cached data if available
+      return productCache[productId];
     }
 
     try {
@@ -49,13 +48,13 @@ export function CartProvider({ children }) {
       return product;
     } catch (error) {
       console.error("Error fetching product details:", error);
-      return null; // Return null if fetch fails
+      return null;
     }
   }, [productCache]);
 
   const fetchProductStock = useCallback(async (productId) => {
     const product = await fetchProductDetails(productId);
-    return product ? product.quantity || 0 : 0; // Use cached product or fetch and return quantity
+    return product ? product.quantity || 0 : 0;
   }, [fetchProductDetails]);
 
   const addToCart = useCallback(async (product) => {
@@ -70,9 +69,14 @@ export function CartProvider({ children }) {
       const existingItem = cartItems.find((item) => item.productId === productId);
       const currentStock = await fetchProductStock(productId);
 
+      if (currentStock === 0) {
+        toast.error(`${product.name} is out of stock.`);
+        return false;
+      }
+
       const newQuantity = existingItem ? existingItem.quantity + 1 : 1;
       if (newQuantity > currentStock) {
-        toast.error(`Cannot add more ${product.name}. Only ${currentStock} left in stock.`);
+        toast.error(`Cannot add ${product.name}. Only ${currentStock} left in stock.`);
         return false;
       }
 
@@ -152,7 +156,7 @@ export function CartProvider({ children }) {
     try {
       const currentStock = await fetchProductStock(productId);
       if (newQuantity > currentStock) {
-        toast.error(`Cannot set quantity to ${newQuantity}. Only ${currentStock} left in stock.`);
+        toast.error(`Cannot set ${cartItems.find((item) => item.productId === productId)?.name} quantity to ${newQuantity}. Only ${currentStock} left in stock.`);
         return;
       }
 
@@ -177,7 +181,7 @@ export function CartProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, removeFromCart, fetchProductStock]);
+  }, [isAuthenticated, removeFromCart, fetchProductStock, cartItems]);
 
   const clearCart = useCallback(async () => {
     if (!isAuthenticated) {
@@ -237,8 +241,8 @@ export function CartProvider({ children }) {
     getCartSummary,
     isSyncing,
     fetchProductStock,
-    fetchProductDetails, // Expose for ProductModal
-    productCache, // Expose cached products
+    fetchProductDetails,
+    productCache,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
