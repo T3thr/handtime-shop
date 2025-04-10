@@ -12,47 +12,46 @@ export default function LineCallback() {
 
   useEffect(() => {
     const handleCallback = async () => {
-      // If user is already authenticated, redirect to homepage immediately
       if (status === "authenticated") {
         router.replace("/");
         return;
       }
 
-      // If user is not authenticated and not in the process of logging in, redirect to home
-      if (status === "unauthenticated" && !isProcessing && !document.referrer.includes("line.me")) {
-        router.replace("/");
-        return;
-      }
+      if (status === "unauthenticated" && !isProcessing) {
+        setIsProcessing(true);
 
-      setIsProcessing(true);
+        try {
+          const { default: liff } = await import("@line/liff");
+          if (!liff.isInited()) {
+            await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
+          }
 
-      try {
-        const { default: liff } = await import("@line/liff");
-        if (!liff.isLoggedIn()) {
-          liff.login({ redirectUri: window.location.href });
-          return;
+          if (!liff.isLoggedIn()) {
+            liff.login({ redirectUri: `${window.location.origin}/auth/callback/line` });
+            return;
+          }
+
+          const profile = await liff.getProfile();
+          const res = await signIn("line", {
+            redirect: false,
+            userId: profile.userId,
+            displayName: profile.displayName,
+            pictureUrl: profile.pictureUrl,
+          });
+
+          if (res?.ok) {
+            //toast.success("LINE login successful!");
+            router.replace("/"); // Redirect to homepage after successful login
+          } else {
+            throw new Error(res?.error || "Authentication failed");
+          }
+        } catch (error) {
+          console.error("LINE callback error:", error);
+          //toast.error(error.message || "Failed to complete LINE login");
+          router.replace("/"); // Redirect to sign-in page on failure
+        } finally {
+          setIsProcessing(false);
         }
-
-        const profile = await liff.getProfile();
-        const res = await signIn("line", {
-          redirect: false,
-          userId: profile.userId,
-          displayName: profile.displayName,
-          pictureUrl: profile.pictureUrl,
-        });
-
-        if (res?.ok) {
-          toast.success("LINE login successful!");
-          router.replace("/"); // Redirect to homepage after successful login
-        } else {
-          throw new Error(res?.error || "Authentication failed");
-        }
-      } catch (error) {
-        console.error("LINE callback error:", error);
-        toast.error(error.message || "Failed to complete LINE login");
-        router.replace("/"); // Redirect to sign-in page on failure
-      } finally {
-        setIsProcessing(false);
       }
     };
 

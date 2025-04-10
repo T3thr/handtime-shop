@@ -2,12 +2,16 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['res.cloudinary.com', 'example.com'], // Add your domains
+    domains: [
+      'res.cloudinary.com',
+      'example.com',
+      'profile.line-scdn.net', // ✅ Added LINE image host
+    ],
   },
   async headers() {
     return [
       {
-        source: '/:all*(svg|jpg|jpeg|png|gif|bmp|mp4|webm)', // Include video types like mp4/webm
+        source: '/:all*(svg|jpg|jpeg|png|gif|bmp|mp4|webm)',
         headers: [
           {
             key: 'X-Content-Type-Options',
@@ -19,7 +23,7 @@ const nextConfig = {
           },
           {
             key: 'Content-Disposition',
-            value: 'inline', // Forces content to be displayed inline rather than downloaded
+            value: 'inline',
           },
         ],
       },

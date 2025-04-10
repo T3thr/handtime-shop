@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { FaTimes, FaUpload, FaTrash, FaPlus, FaCheck, FaExclamationTriangle, FaTag, FaBoxOpen, FaStar } from "react-icons/fa";
 import { addProduct, updateProduct, addCategory, updateCategory } from "@/backend/lib/dashboardAction";
 
-export const ProductFormModal = ({ isOpen, onClose, product = null, categories = [], refetchProducts }) => {
+export const ProductFormModal = ({ isOpen, onClose, product = null, categories = [] }) => {
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -72,7 +72,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
       
       setFormData(initialData);
       initialFormDataRef.current = JSON.stringify(initialData);
-
       if (product.images && product.images.length > 0) {
         setImagePreviewUrls(product.images.map(img => img.url));
       }
@@ -113,10 +112,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
 
   useEffect(() => {
     if (!product && formData.name && !formData.slug) {
-      const slug = formData.name
-        .toLowerCase()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/\s+/g, '-');
+      const slug = formData.name.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
       setFormData(prev => ({ ...prev, slug }));
     }
   }, [formData.name, product]);
@@ -143,44 +139,30 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
     const { value, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      categories: checked
-        ? [...prev.categories, value]
-        : prev.categories.filter(cat => cat !== value)
+      categories: checked ? [...prev.categories, value] : prev.categories.filter(cat => cat !== value)
     }));
   };
 
   const handleAddTag = () => {
     if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, newTag.trim()]
-      }));
+      setFormData(prev => ({ ...prev, tags: [...prev.tags, newTag.trim()] }));
       setNewTag("");
     }
   };
 
   const handleRemoveTag = (tag) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(t => t !== tag)
-    }));
+    setFormData(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
   };
 
   const uploadImageToCloudinary = async (file) => {
     const formData = new FormData();
     formData.append("file", file);
-
     try {
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
+      const response = await fetch("/api/upload", { method: "POST", body: formData });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to upload image");
       }
-
       const data = await response.json();
       return { url: data.url, public_id: data.public_id };
     } catch (error) {
@@ -196,7 +178,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
 
     const newImageFiles = [...imageFiles, ...files];
     setImageFiles(newImageFiles);
-
     const newPreviewUrls = [...imagePreviewUrls];
     const newImages = [...formData.images];
 
@@ -266,7 +247,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
     if (!validateForm()) return;
 
     setIsSubmitting(true);
-
     try {
       const productData = {
         ...formData,
@@ -279,14 +259,12 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
 
       if (product) {
         await updateProduct(product._id, productData);
-        toast.success("Product updated successfully!");
       } else {
         await addProduct(productData);
-        toast.success("Product added successfully!");
       }
 
       setHasUnsavedChanges(false);
-      refetchProducts(); // Refetch products after action
+      localStorage.removeItem('productFormAutoSave');
       onClose();
     } catch (error) {
       console.error("Error saving product:", error);
@@ -353,7 +331,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
           <div className="overflow-y-auto p-6 max-h-[calc(90vh-80px)]">
             <form onSubmit={handleSubmit}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Basic Information */}
                 <div className="md:col-span-2">
                   <h3 className="text-lg font-medium text-text-primary mb-4">Basic Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -384,7 +361,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                   </div>
                 </div>
 
-                {/* Description */}
                 <div className="md:col-span-2">
                   <label className="block text-text-secondary mb-1">Description</label>
                   <textarea
@@ -397,7 +373,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                   />
                 </div>
 
-                {/* Short Description */}
                 <div className="md:col-span-2">
                   <label className="block text-text-secondary mb-1">Short Description</label>
                   <textarea
@@ -410,7 +385,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                   />
                 </div>
 
-                {/* Pricing */}
                 <div className="md:col-span-2">
                   <h3 className="text-lg font-medium text-text-primary mb-4">Pricing</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -462,7 +436,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                   </div>
                 </div>
 
-                {/* Inventory */}
                 <div className="md:col-span-2">
                   <h3 className="text-lg font-medium text-text-primary mb-4">Inventory</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -565,7 +538,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                   </div>
                 </div>
 
-                {/* Categories and Tags */}
                 <div>
                   <h3 className="text-lg font-medium text-text-primary mb-4">Categories</h3>
                   <div className="max-h-60 overflow-y-auto p-4 border border-border-primary rounded-lg bg-background">
@@ -624,7 +596,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                   </div>
                 </div>
 
-                {/* Images */}
                 <div className="md:col-span-2">
                   <h3 className="text-lg font-medium text-text-primary mb-4">Images</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-4">
@@ -665,7 +636,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                   </div>
                 </div>
 
-                {/* Status */}
                 <div className="md:col-span-2">
                   <h3 className="text-lg font-medium text-text-primary mb-4">Status</h3>
                   <div className="flex space-x-4">
@@ -708,7 +678,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                   </div>
                 </div>
 
-                {/* Additional Information */}
                 <div className="md:col-span-2">
                   <h3 className="text-lg font-medium text-text-primary mb-4">Additional Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -719,7 +688,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         name="type"
                         value={formData.type}
                         onChange={handleChange}
-                        placeholder="e.g., Handcraft, Jewelry"
+                        placeholder="e.g., Electronics, Clothing"
                         className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                     </div>
@@ -730,14 +699,13 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         name="vendor"
                         value={formData.vendor}
                         onChange={handleChange}
-                        placeholder="e.g., Uttaradit Artisan"
+                        placeholder="e.g., Apple, Nike"
                         className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* SEO */}
                 <div className="md:col-span-2">
                   <h3 className="text-lg font-medium text-text-primary mb-4">SEO</h3>
                   <div className="grid grid-cols-1 gap-4">
@@ -806,7 +774,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
   );
 };
 
-export const CategoryFormModal = ({ isOpen, onClose, category = null, refetchCategories }) => {
+export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -814,13 +782,29 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, refetchCat
     image: { url: "", public_id: "" },
     priority: "normal"
   });
-
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [mainCategoriesCount, setMainCategoriesCount] = useState(0);
   const initialFormDataRef = useRef(null);
   const modalRef = useRef(null);
+
+  // Fetch existing main categories count
+  useEffect(() => {
+    const fetchMainCategories = async () => {
+      try {
+        const response = await fetch("/api/category");
+        const categories = await response.json();
+        const mainCount = categories.filter(cat => cat.priority === "main").length;
+        setMainCategoriesCount(mainCount);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+        toast.error("Failed to load category data.");
+      }
+    };
+    if (isOpen) fetchMainCategories();
+  }, [isOpen]);
 
   useEffect(() => {
     if (category) {
@@ -831,15 +815,9 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, refetchCat
         image: category.image || { url: "", public_id: "" },
         priority: category.priority || "normal"
       };
-      
       setFormData(initialData);
       initialFormDataRef.current = JSON.stringify(initialData);
-      
-      if (category.image && category.image.url) {
-        setImagePreview(category.image.url);
-      } else {
-        setImagePreview("");
-      }
+      setImagePreview(category.image?.url || "");
     } else {
       const initialData = {
         name: "",
@@ -848,21 +826,16 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, refetchCat
         image: { url: "", public_id: "" },
         priority: "normal"
       };
-      
       setFormData(initialData);
       initialFormDataRef.current = JSON.stringify(initialData);
       setImagePreview("");
     }
-    
     setHasUnsavedChanges(false);
   }, [category, isOpen]);
 
   useEffect(() => {
     if (!category && formData.name && !formData.slug) {
-      const slug = formData.name
-        .toLowerCase()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/\s+/g, '-');
+      const slug = formData.name.toLowerCase().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-");
       setFormData(prev => ({ ...prev, slug }));
     }
   }, [formData.name, category]);
@@ -881,9 +854,7 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, refetchCat
         try {
           const parsedData = JSON.parse(savedData);
           setFormData(parsedData);
-          if (parsedData.image && parsedData.image.url) {
-            setImagePreview(parsedData.image.url);
-          }
+          setImagePreview(parsedData.image?.url || "");
           toast.info("Restored your unsaved changes.");
           localStorage.removeItem('categoryFormAutoSave');
         } catch (error) {
@@ -896,26 +867,18 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, refetchCat
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: null }));
-    }
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: null }));
   };
 
   const uploadImageToCloudinary = async (file) => {
     const formData = new FormData();
     formData.append("file", file);
-
     try {
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
+      const response = await fetch("/api/upload", { method: "POST", body: formData });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to upload image");
       }
-
       const data = await response.json();
       return { url: data.url, public_id: data.public_id };
     } catch (error) {
@@ -937,7 +900,7 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, refetchCat
       const uploadedImage = await uploadImageToCloudinary(file);
       setFormData(prev => ({ ...prev, image: uploadedImage }));
     } catch (error) {
-      setImagePreview("");
+      setImagePreview(formData.image.url || "");
     }
   };
 
@@ -950,6 +913,13 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, refetchCat
     const newErrors = {};
     if (!formData.name.trim()) newErrors.name = "Name is required";
     if (!formData.slug.trim()) newErrors.slug = "Slug is required";
+    if (
+      formData.priority === "main" &&
+      mainCategoriesCount >= 4 &&
+      (!category || category.priority !== "main")
+    ) {
+      newErrors.priority = "Cannot add more than 4 'Main' categories";
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -967,11 +937,8 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, refetchCat
 
       if (category) {
         await updateCategory(categoryData);
-        toast.success("Category updated successfully!");
       } else {
         await addCategory(categoryData);
-        toast.success("Category added successfully!");
-        
         setImagePreview("");
         setFormData({
           name: "",
@@ -981,13 +948,13 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, refetchCat
           priority: "normal"
         });
       }
-      
+
       setHasUnsavedChanges(false);
       localStorage.removeItem('categoryFormAutoSave');
-      refetchCategories(); // Refetch categories after action
       onClose();
     } catch (error) {
-      toast.error("Failed to save category.");
+      console.error("Error saving category:", error);
+      toast.error(error.message || "Failed to save category.");
     } finally {
       setIsSubmitting(false);
     }
@@ -1053,9 +1020,7 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, refetchCat
                     value={formData.name}
                     onChange={handleChange}
                     placeholder="Enter category name"
-                    className={`w-full px-4 py-2 rounded-lg border ${
-                      errors.name ? "border-error" : "border-border-primary"
-                    } bg-background focus:outline-none focus:ring-2 focus:ring-primary/50`}
+                    className={`w-full px-4 py-2 rounded-lg border ${errors.name ? "border-error" : "border-border-primary"} bg-background focus:outline-none focus:ring-2 focus:ring-primary/50`}
                   />
                   {errors.name && <p className="mt-1 text-sm text-error">{errors.name}</p>}
                 </div>
@@ -1067,9 +1032,7 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, refetchCat
                     value={formData.slug}
                     onChange={handleChange}
                     placeholder="category-url-slug"
-                    className={`w-full px-4 py-2 rounded-lg border ${
-                      errors.slug ? "border-error" : "border-border-primary"
-                    } bg-background focus:outline-none focus:ring-2 focus:ring-primary/50`}
+                    className={`w-full px-4 py-2 rounded-lg border ${errors.slug ? "border-error" : "border-border-primary"} bg-background focus:outline-none focus:ring-2 focus:ring-primary/50`}
                   />
                   {errors.slug && <p className="mt-1 text-sm text-error">{errors.slug}</p>}
                 </div>
@@ -1090,14 +1053,15 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, refetchCat
                     name="priority"
                     value={formData.priority}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className={`w-full px-4 py-2 rounded-lg border ${errors.priority ? "border-error" : "border-border-primary"} bg-background focus:outline-none focus:ring-2 focus:ring-primary/50`}
                   >
                     <option value="main">Main (Featured on homepage)</option>
                     <option value="normal">Normal</option>
                   </select>
                   <p className="mt-1 text-xs text-text-muted">
-                    Main categories will be prominently displayed on the homepage
+                    Main categories are limited to 4 and displayed on the homepage. Current count: {mainCategoriesCount}/4
                   </p>
+                  {errors.priority && <p className="mt-1 text-sm text-error">{errors.priority}</p>}
                 </div>
                 <div>
                   <label className="block text-text-secondary mb-2">Category Image</label>
@@ -1172,7 +1136,7 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, refetchCat
   );
 };
 
-export const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemType, itemName, refetch }) => {
+export const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemType, itemName }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const modalRef = useRef(null);
 
@@ -1180,8 +1144,6 @@ export const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemType, 
     setIsDeleting(true);
     try {
       await onConfirm();
-      toast.success(`${itemType} deleted successfully!`);
-      if (refetch) refetch(); // Refetch data after deletion
       onClose();
     } catch (error) {
       console.error(`Error deleting ${itemType.toLowerCase()}:`, error);

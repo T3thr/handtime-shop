@@ -11,44 +11,39 @@ export async function GET(request) {
   }
 
   try {
-    // Get pagination parameters from URL
-    const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "10");
-    const skip = (page - 1) * limit;
-    const status = searchParams.get("status") || null;
-
     await dbConnect();
     
-    // Build query
-    const query = {};
-    if (status && status !== 'all') {
-      query.status = status;
-    }
+    // Get pagination parameters and filters from URL
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page')) || 1;
+    const limit = parseInt(searchParams.get('limit')) || 10;
+    const status = searchParams.get('status') || 'all';
+    const skip = (page - 1) * limit;
     
-    // Get total count for pagination
+    // Build query based on status filter
+    const query = status !== 'all' ? { status } : {};
+    
+    // Count total orders for pagination
     const total = await Order.countDocuments(query);
+    const totalPages = Math.ceil(total / limit);
     
-    // Get paginated orders
+    // Fetch orders with pagination
     const orders = await Order.find(query)
-      .select('orderId userId totalAmount status createdAt updatedAt items')
+      .populate('userId', 'name email avatar')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
     
-    // Calculate total pages
-    const totalPages = Math.ceil(total / limit);
-    
     return NextResponse.json({
       orders,
-      total,
-      totalPages,
       page,
-      limit
+      limit,
+      total,
+      totalPages
     });
   } catch (error) {
-    console.error("Failed to fetch orders:", error);
+    console.error('Error fetching orders:', error);
     return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 });
   }
 }

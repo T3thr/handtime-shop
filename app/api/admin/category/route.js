@@ -26,14 +26,24 @@ export async function POST(request) {
       slug,
       description: data.description || "",
       image: data.image && data.image.url ? { url: data.image.url, public_id: data.image.public_id } : undefined,
-      priority: data.priority || "normal", // Add priority field with default value
+      priority: data.priority || "normal",
       createdBy: session.user.id,
     };
+
+    // Check "main" priority limit before saving
+    if (categoryData.priority === "main") {
+      const mainCount = await Category.countDocuments({ priority: "main" });
+      if (mainCount >= 4) {
+        return NextResponse.json(
+          { error: "Cannot add more than 4 categories with 'main' priority" },
+          { status: 400 }
+        );
+      }
+    }
 
     const category = new Category(categoryData);
     await category.save();
 
-    // Emit event if Socket.IO is configured
     if (request.socket?.server?.io) {
       request.socket.server.io.emit("category_added", category);
     }
@@ -59,9 +69,23 @@ export async function PUT(request) {
       slug,
       description: data.description || "",
       image: data.image && data.image.url ? { url: data.image.url, public_id: data.image.public_id } : undefined,
-      priority: data.priority || "normal", // Add priority field with default value
+      priority: data.priority || "normal",
       updatedBy: session.user.id,
     };
+
+    // Check "main" priority limit for updates
+    if (updatedCategory.priority === "main") {
+      const existingCategory = await Category.findOne({ slug: data.slug });
+      if (!existingCategory || existingCategory.priority !== "main") {
+        const mainCount = await Category.countDocuments({ priority: "main" });
+        if (mainCount >= 4) {
+          return NextResponse.json(
+            { error: "Cannot have more than 4 categories with 'main' priority" },
+            { status: 400 }
+          );
+        }
+      }
+    }
 
     const category = await Category.findOneAndUpdate({ slug: data.slug }, updatedCategory, { new: true });
     if (!category) {

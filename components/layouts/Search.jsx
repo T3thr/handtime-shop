@@ -113,7 +113,7 @@ const Search = () => {
       .map((item) => ({
         name: item.name,
         content: item.content,
-        href: item.href, // Include href for sidebar navigation
+        href: item.href,
         type: "sidebar",
       }));
 
@@ -131,11 +131,9 @@ const Search = () => {
         );
         break;
       case "category":
-        const categoryElement = document.querySelector(`[data-category="${result.slug}"]`);
-        if (categoryElement) {
-          categoryElement.scrollIntoView({ behavior: "smooth", block: "center" });
-          highlightKeyword(result.name);
-        }
+        document.dispatchEvent(
+          new CustomEvent("openCategoryModal", { detail: { slug: result.slug, keyword: result.name } })
+        );
         break;
       case "learn-more":
         document.dispatchEvent(

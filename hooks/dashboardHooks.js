@@ -4,7 +4,40 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
-// Custom hook for fetching orders with proper error handling and loading states
+// Custom hook for fetching user data with proper error handling and loading states
+export const useUserData = () => {
+  const [userData, setUserData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      setIsLoading(true);
+      setIsError(false);
+      
+      try {
+        const response = await axios.get('/api/user');
+        setUserData(response.data);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        setIsError(true);
+        toast.error('Failed to load user data. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
+  return {
+    userData,
+    isLoading,
+    isError
+  };
+};
+
+// Custom hook for fetching user's orders with proper error handling and loading states
 export const useOrders = (initialPage = 1, initialLimit = 10) => {
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -22,7 +55,7 @@ export const useOrders = (initialPage = 1, initialLimit = 10) => {
       setIsError(false);
       
       try {
-        const response = await axios.get(`/api/orders?page=${pagination.page}&limit=${pagination.limit}`);
+        const response = await axios.get(`/api/orders/get?page=${pagination.page}&limit=${pagination.limit}`);
         setOrders(response.data.orders || []);
         setPagination({
           page: response.data.page || pagination.page,
@@ -120,6 +153,44 @@ export const useAllOrders = (initialPage = 1, initialLimit = 10, status = 'all')
     }));
   };
 
+  // Function to update order status
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const response = await axios.put(`/api/admin/orders/${orderId}/status`, { status: newStatus });
+      
+      // Update local state
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.orderId === orderId ? { ...order, status: newStatus } : order
+        )
+      );
+      
+      toast.success('Order status updated successfully');
+      return response.data;
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      toast.error('Failed to update order status');
+      throw error;
+    }
+  };
+
+  // Function to delete order
+  const deleteOrder = async (orderId) => {
+    try {
+      const response = await axios.delete(`/api/admin/orders/${orderId}`);
+      
+      // Update local state
+      setOrders(prevOrders => prevOrders.filter(order => order.orderId !== orderId));
+      
+      toast.success('Order deleted successfully');
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting order:', error);
+      toast.error('Failed to delete order');
+      throw error;
+    }
+  };
+
   return {
     orders,
     isLoading,
@@ -127,7 +198,9 @@ export const useAllOrders = (initialPage = 1, initialLimit = 10, status = 'all')
     pagination,
     changePage,
     changeLimit,
-    status
+    status,
+    updateOrderStatus,
+    deleteOrder
   };
 };
 
@@ -150,7 +223,44 @@ export const useWishlist = (initialPage = 1, initialLimit = 10) => {
       
       try {
         const response = await axios.get(`/api/wishlist?page=${pagination.page}&limit=${pagination.limit}`);
-        setWishlist(response.data.wishlist || []);
+        
+        // Process wishlist items to include product details
+        const wishlistItems = response.data.wishlist || [];
+        
+        // Fetch product details for each wishlist item
+        const processedWishlist = await Promise.all(
+          wishlistItems.map(async (item) => {
+            try {
+              const productResponse = await axios.get(`/api/products/${item.productId}`);
+              const product = productResponse.data;
+              
+              return {
+                productId: item.productId,
+                name: product.name,
+                price: product.price,
+                description: product.description,
+                image: product.images && product.images.length > 0 ? product.images[0].url : null,
+                category: product.categories && product.categories.length > 0 ? product.categories[0] : '',
+                status: product.status,
+                addedAt: item.addedAt
+              };
+            } catch (error) {
+              console.error(`Error fetching product ${item.productId}:`, error);
+              return {
+                productId: item.productId,
+                name: 'Product not available',
+                price: 0,
+                description: '',
+                image: null,
+                category: '',
+                status: 'inactive',
+                addedAt: item.addedAt
+              };
+            }
+          })
+        );
+        
+        setWishlist(processedWishlist);
         setPagination({
           page: response.data.page || pagination.page,
           limit: response.data.limit || pagination.limit,
@@ -196,7 +306,42 @@ export const useWishlist = (initialPage = 1, initialLimit = 10) => {
       if (response.data.message === 'Added to wishlist') {
         // Refresh wishlist data
         const refreshResponse = await axios.get(`/api/wishlist?page=${pagination.page}&limit=${pagination.limit}`);
-        setWishlist(refreshResponse.data.wishlist || []);
+        
+        // Process new wishlist items
+        const wishlistItems = refreshResponse.data.wishlist || [];
+        const processedWishlist = await Promise.all(
+          wishlistItems.map(async (item) => {
+            try {
+              const productResponse = await axios.get(`/api/products/${item.productId}`);
+              const product = productResponse.data;
+              
+              return {
+                productId: item.productId,
+                name: product.name,
+                price: product.price,
+                description: product.description,
+                image: product.images && product.images.length > 0 ? product.images[0].url : null,
+                category: product.categories && product.categories.length > 0 ? product.categories[0] : '',
+                status: product.status,
+                addedAt: item.addedAt
+              };
+            } catch (error) {
+              console.error(`Error fetching product ${item.productId}:`, error);
+              return {
+                productId: item.productId,
+                name: 'Product not available',
+                price: 0,
+                description: '',
+                image: null,
+                category: '',
+                status: 'inactive',
+                addedAt: item.addedAt
+              };
+            }
+          })
+        );
+        
+        setWishlist(processedWishlist);
         setPagination({
           page: refreshResponse.data.page || pagination.page,
           limit: refreshResponse.data.limit || pagination.limit,
@@ -289,38 +434,5 @@ export const useUsers = (initialPage = 1, initialLimit = 10) => {
     pagination,
     changePage,
     changeLimit
-  };
-};
-
-// Hook for fetching user data
-export const useUserData = () => {
-  const [userData, setUserData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      setIsLoading(true);
-      setIsError(false);
-      
-      try {
-        const response = await axios.get('/api/user');
-        setUserData(response.data);
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-        setIsError(true);
-        toast.error('Failed to load user data. Please try again.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchUserData();
-  }, []);
-
-  return {
-    userData,
-    isLoading,
-    isError
   };
 };

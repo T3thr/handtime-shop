@@ -15,7 +15,7 @@ export const options = {
         displayName: { label: "Display Name", type: "text" },
         pictureUrl: { label: "Picture URL", type: "text" },
       },
-      async authorize(credentials, req) {
+      async authorize(credentials) {
         try {
           await mongodbConnect();
 
@@ -92,7 +92,7 @@ export const options = {
           };
         } catch (error) {
           console.error("Admin authorization error:", error);
-          throw error;
+          throw new Error(error.message || "Admin authentication failed");
         }
       },
     }),
@@ -134,9 +134,6 @@ export const options = {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  jwt: {
-    secret: process.env.NEXTAUTH_SECRET,
-  },
 };
 
-export default NextAuth(options);
+export default options;

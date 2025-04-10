@@ -42,4 +42,28 @@ const CategorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+CategorySchema.pre("save", async function (next) {
+  if (this.priority === "main" && this.isNew) {
+    const mainCount = await mongoose.model("Category").countDocuments({ priority: "main" });
+    if (mainCount >= 4) {
+      return next(new Error("Cannot have more than 4 categories with 'main' priority."));
+    }
+  }
+  next();
+});
+
+CategorySchema.pre("findOneAndUpdate", async function (next) {
+  const update = this.getUpdate();
+  if (update.priority === "main") {
+    const existingCategory = await this.model.findOne(this.getQuery());
+    if (!existingCategory || existingCategory.priority !== "main") {
+      const mainCount = await this.model.countDocuments({ priority: "main" });
+      if (mainCount >= 4) {
+        return next(new Error("Cannot have more than 4 categories with 'main' priority."));
+      }
+    }
+  }
+  next();
+});
+
 export default mongoose.models.Category || mongoose.model("Category", CategorySchema);

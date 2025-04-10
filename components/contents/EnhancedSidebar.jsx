@@ -24,12 +24,15 @@ import { signOut } from "next-auth/react";
 import Image from "next/image";
 import { useTheme } from "@/context/Theme";
 import { useSidebar } from "@/context/DashboardSidebarContext";
+import { Shield, Copy, Eye, EyeOff } from "lucide-react";
+import { toast } from "react-toastify";
 
 export const Sidebar = ({ activeSection, setActiveSection, session }) => {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const { isOpen, toggleSidebar, isCollapsed, toggleCollapse } = useSidebar();
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
+  const [showUserId, setShowUserId] = useState(false); // Added for LINE ID toggle
   
   const handleSignOut = async () => {
     await signOut({ redirect: false });
@@ -94,6 +97,86 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
         damping: 30 
       }
     }
+  };
+
+  // Avatar rendering function from SideBar.jsx
+  const getUserAvatar = () => {
+    if (session?.user?.role === "admin") {
+      return (
+        <div className={`h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center ${isCollapsed ? "w-8 h-8" : "w-10 h-10"}`}>
+          <Shield className="h-5 w-5 text-blue-600" />
+        </div>
+      );
+    }
+    if (session?.user?.image) {
+      return (
+        <Image
+          src={session.user.image}
+          alt={session.user.name || "User"}
+          fill
+          className="object-cover rounded-full"
+        />
+      );
+    }
+    return (
+      <div className={`h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center ${isCollapsed ? "w-8 h-8" : "w-10 h-10"}`}>
+        <FaUser className="h-6 w-6 text-primary" />
+      </div>
+    );
+  };
+
+  // Role badge rendering function from SideBar.jsx
+  const getUserRoleBadge = () => {
+    if (!session?.user?.role) return null;
+    return (
+      <span
+        className={`text-xs px-2 py-1 rounded-full ${
+          session.user.role === "admin" ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"
+        }`}
+      >
+        {session.user.role}
+      </span>
+    );
+  };
+
+  // User info rendering function adapted from SideBar.jsx
+  const renderUserInfo = () => {
+    if (session?.user?.email) {
+      return session.user.email;
+    } else if (session?.user?.lineId) {
+      return (
+        <div className="flex flex-col space-y-2">
+          <span className="truncate">{session.user.name || "LINE User"}</span>
+          <div className="flex items-center space-x-1">
+            <button
+              onClick={() => setShowUserId(!showUserId)}
+              className="p-1 rounded hover:bg-container"
+              aria-label={showUserId ? "Hide User ID" : "Show User ID"}
+            >
+              {showUserId ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+            {showUserId && (
+              <div className="flex items-center space-x-1 max-w-24 overflow-hidden">
+                <span className="text-xs bg-container px-2 py-1 rounded truncate">
+                  {session.user.lineId}
+                </span>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(session.user.lineId);
+                    toast.success("User ID copied to clipboard");
+                  }}
+                  className="p-1 rounded hover:bg-container flex-shrink-0"
+                  aria-label="Copy User ID"
+                >
+                  <Copy size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return "Guest";
   };
 
   return (
@@ -178,17 +261,11 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
         >
           <div className={`flex ${isCollapsed ? "justify-center" : "items-center"}`}>
             <motion.div 
-              className={`relative rounded-full overflow-hidden bg-background-secondary ${isCollapsed ? "w-8 h-8" : "w-10 h-10"}`}
+              className="relative rounded-full overflow-hidden"
               whileHover={{ scale: 1.1 }}
               transition={{ type: "spring", stiffness: 400, damping: 10 }}
             >
-              {session?.user?.image ? (
-                <Image src={session.user.image} alt={session.user.name} fill className="object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center font-medium text-primary">
-                  {session?.user?.name?.charAt(0) || "U"}
-                </div>
-              )}
+              {getUserAvatar()}
             </motion.div>
             {!isCollapsed && (
               <motion.div 
@@ -197,8 +274,11 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                 animate={{ x: 0, opacity: 1 }}
                 transition={{ delay: 0.3 }}
               >
-                <p className="font-medium text-text-primary truncate">{session?.user?.name || "User"}</p>
-                <p className="text-xs text-text-muted truncate">{session?.user?.email || "user@example.com"}</p>
+                <div className="flex items-center space-x-2">
+                  <h2 className="font-medium text-text-primary truncate">{session?.user?.name || "Guest"}</h2>
+                  {getUserRoleBadge()}
+                </div>
+                <p className="text-sm text-text-secondary">{renderUserInfo()}</p>
               </motion.div>
             )}
           </div>

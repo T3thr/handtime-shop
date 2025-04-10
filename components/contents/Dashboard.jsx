@@ -22,7 +22,14 @@ import {
   DeleteConfirmationModal 
 } from "@/components/contents/DashboardForms";
 import { useCart } from "@/context/CartContext";
-import { useProducts, useCategories, deleteProduct, deleteCategory } from "@/backend/lib/dashboardAction";
+import { 
+  useProducts, 
+  useCategories, 
+  deleteProduct, 
+  deleteCategory,
+  useUsers,
+  useAllOrders
+} from "@/backend/lib/dashboardAction";
 import { toast } from "react-toastify";
 
 export default function Dashboard({ session }) {
@@ -36,8 +43,7 @@ export default function Dashboard({ session }) {
   const [deleteItem, setDeleteItem] = React.useState({ type: "", id: "", name: "" });
   
   const { addToCart } = useCart();
-  const { products, refetch: refetchProducts } = useProducts(); // Added refetch from useProducts
-  const { categories, refetch: refetchCategories } = useCategories(); // Added refetch from useCategories
+  const { categories } = useCategories();
   
   const handleAddProduct = () => {
     setSelectedProduct(null);
@@ -50,7 +56,7 @@ export default function Dashboard({ session }) {
   };
   
   const handleDeleteProduct = (slug) => {
-    const product = products.find(p => p.slug === slug); // Fixed to use products instead of categories
+    const product = categories.find(p => p.slug === slug);
     setDeleteItem({
       type: "Product",
       id: slug,
@@ -63,7 +69,6 @@ export default function Dashboard({ session }) {
     try {
       await deleteProduct(deleteItem.id);
       toast.success("Product deleted successfully!");
-      refetchProducts(); // Refetch products after deletion
     } catch (error) {
       console.error("Error deleting product:", error);
       toast.error("Failed to delete product");
@@ -94,11 +99,8 @@ export default function Dashboard({ session }) {
   const confirmDeleteCategory = async () => {
     try {
       await deleteCategory(deleteItem.id);
-      toast.success("Category deleted successfully!");
-      refetchCategories(); // Refetch categories after deletion
     } catch (error) {
       console.error("Error deleting category:", error);
-      toast.error("Failed to delete category");
       throw error;
     }
   };
@@ -154,8 +156,6 @@ export default function Dashboard({ session }) {
             onAddCategory={handleAddCategory}
             onEditCategory={handleEditCategory}
             onDeleteCategory={handleDeleteCategory}
-            refetchProducts={refetchProducts} // Pass refetchProducts
-            refetchCategories={refetchCategories} // Pass refetchCategories
           />
         );
       case "users":
@@ -207,14 +207,12 @@ export default function Dashboard({ session }) {
         onClose={() => setIsProductModalOpen(false)}
         product={selectedProduct}
         categories={categories}
-        refetchProducts={refetchProducts} // Pass refetchProducts to ProductFormModal
       />
       
       <CategoryFormModal
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
         category={selectedCategory}
-        refetchCategories={refetchCategories} // Pass refetchCategories to CategoryFormModal
       />
       
       <DeleteConfirmationModal
@@ -223,7 +221,6 @@ export default function Dashboard({ session }) {
         onConfirm={deleteItem.type === "Product" ? confirmDeleteProduct : confirmDeleteCategory}
         itemType={deleteItem.type}
         itemName={deleteItem.name}
-        refetch={deleteItem.type === "Product" ? refetchProducts : refetchCategories} // Pass appropriate refetch
       />
     </div>
   );

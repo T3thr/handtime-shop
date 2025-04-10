@@ -16,29 +16,39 @@ export const useProducts = (initialPage = 1, initialLimit = 50) => {
     totalPages: 0
   });
 
-  const fetchProducts = async () => {
-    setIsLoading(true);
-    setIsError(false);
-    
-    try {
-      const response = await axios.get(`/api/products?page=${pagination.page}&limit=${pagination.limit}`);
-      setProducts(response.data.products || []);
-      setPagination({
-        page: response.data.page || pagination.page,
-        limit: response.data.limit || pagination.limit,
-        total: response.data.total || 0,
-        totalPages: response.data.totalPages || 0
-      });
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      setIsError(true);
-      toast.error('Failed to load products. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchProducts = async () => {
+      setIsLoading(true);
+      setIsError(false);
+      
+      try {
+        const response = await axios.get(`/api/products?page=${pagination.page}&limit=${pagination.limit}`);
+        
+        // Ensure we have proper image URLs for products
+        const productsWithImages = response.data.products.map(product => ({
+          ...product,
+          images: product.images.map(image => ({
+            ...image,
+            url: image.url || "/images/placeholder.jpg"
+          }))
+        }));
+        
+        setProducts(productsWithImages || []);
+        setPagination({
+          page: response.data.page || pagination.page,
+          limit: response.data.limit || pagination.limit,
+          total: response.data.total || 0,
+          totalPages: response.data.totalPages || 0
+        });
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        setIsError(true);
+        toast.error('Failed to load products. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     fetchProducts();
   }, [pagination.page, pagination.limit]);
 
@@ -63,8 +73,7 @@ export const useProducts = (initialPage = 1, initialLimit = 50) => {
     isError,
     pagination,
     changePage,
-    changeLimit,
-    refetch: fetchProducts // Added refetch function
+    changeLimit
   };
 };
 
@@ -86,7 +95,17 @@ export const useProduct = (productId) => {
       
       try {
         const response = await axios.get(`/api/products/${productId}`);
-        setProduct(response.data);
+        
+        // Ensure we have proper image URLs
+        const productWithImages = {
+          ...response.data,
+          images: response.data.images.map(image => ({
+            ...image,
+            url: image.url || "/images/placeholder.jpg"
+          }))
+        };
+        
+        setProduct(productWithImages);
       } catch (error) {
         console.error('Error fetching product:', error);
         setIsError(true);
@@ -157,7 +176,17 @@ export const useCategories = () => {
     
     try {
       const response = await axios.get('/api/category');
-      setCategories(response.data || []);
+      
+      // Ensure we have proper image URLs for categories
+      const categoriesWithImages = response.data.map(category => ({
+        ...category,
+        image: category.image ? {
+          ...category.image,
+          url: category.image.url || "/images/placeholder.jpg"
+        } : null
+      }));
+      
+      setCategories(categoriesWithImages || []);
     } catch (error) {
       console.error('Error fetching categories:', error);
       setIsError(true);
@@ -239,7 +268,14 @@ export const useUsers = (initialPage = 1, initialLimit = 10) => {
       
       try {
         const response = await axios.get(`/api/admin/users?page=${pagination.page}&limit=${pagination.limit}`);
-        setUsers(response.data.users || []);
+        
+        // Ensure we have proper avatar URLs
+        const usersWithAvatars = response.data.users.map(user => ({
+          ...user,
+          avatar: user.avatar || "/images/avatar-placeholder.jpg"
+        }));
+        
+        setUsers(usersWithAvatars || []);
         setPagination({
           page: response.data.page || pagination.page,
           limit: response.data.limit || pagination.limit,
@@ -280,5 +316,125 @@ export const useUsers = (initialPage = 1, initialLimit = 10) => {
     pagination,
     changePage,
     changeLimit
+  };
+};
+
+// Hook for fetching all orders (admin only)
+export const useAllOrders = (initialPage = 1, initialLimit = 10, status = 'all') => {
+  const [orders, setOrders] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
+  const [pagination, setPagination] = useState({
+    page: initialPage,
+    limit: initialLimit,
+    total: 0,
+    totalPages: 0
+  });
+
+  useEffect(() => {
+    const fetchAllOrders = async () => {
+      setIsLoading(true);
+      setIsError(false);
+      
+      try {
+        const response = await axios.get(`/api/admin/orders?page=${pagination.page}&limit=${pagination.limit}&status=${status}`);
+        
+        // Ensure we have proper image URLs for items and user avatars
+        const ordersWithImages = response.data.orders.map(order => ({
+          ...order,
+          items: order.items.map(item => ({
+            ...item,
+            image: item.image || "/images/placeholder.jpg"
+          })),
+          userId: order.userId ? {
+            ...order.userId,
+            avatar: order.userId.avatar || "/images/avatar-placeholder.jpg"
+          } : null
+        }));
+        
+        setOrders(ordersWithImages || []);
+        setPagination({
+          page: response.data.page || pagination.page,
+          limit: response.data.limit || pagination.limit,
+          total: response.data.total || 0,
+          totalPages: response.data.totalPages || 0
+        });
+      } catch (error) {
+        console.error('Error fetching all orders:', error);
+        setIsError(true);
+        toast.error('Failed to load orders. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAllOrders();
+  }, [pagination.page, pagination.limit, status]);
+
+  const changePage = (newPage) => {
+    setPagination(prev => ({
+      ...prev,
+      page: newPage
+    }));
+  };
+
+  const changeLimit = (newLimit) => {
+    setPagination(prev => ({
+      ...prev,
+      limit: newLimit,
+      page: 1 // Reset to first page when changing limit
+    }));
+  };
+  
+  // Function to update order status
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const response = await axios.put(`/api/admin/orders/${orderId}/status`, { 
+        status: newStatus 
+      });
+      
+      // Update local state
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.orderId === orderId 
+            ? { ...order, status: newStatus, updatedAt: new Date().toISOString() } 
+            : order
+        )
+      );
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      toast.error('Failed to update order status');
+      throw error;
+    }
+  };
+  
+  // Function to delete an order
+  const deleteOrder = async (orderId) => {
+    try {
+      await axios.delete(`/api/admin/orders/${orderId}`);
+      
+      // Update local state
+      setOrders(prevOrders => prevOrders.filter(order => order.orderId !== orderId));
+      
+      return true;
+    } catch (error) {
+      console.error('Error deleting order:', error);
+      toast.error('Failed to delete order');
+      throw error;
+    }
+  };
+
+  return {
+    orders,
+    isLoading,
+    isError,
+    pagination,
+    changePage,
+    changeLimit,
+    status,
+    updateOrderStatus,
+    deleteOrder
   };
 };

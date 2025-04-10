@@ -1,3 +1,4 @@
+// components/layouts/SideBar.jsx
 "use client";
 import React, { useState, useCallback, useContext, useEffect } from "react";
 import Link from "next/link";
@@ -11,7 +12,6 @@ import { FaLine } from "react-icons/fa";
 import { useSidebar } from "@/context/SidebarContext";
 import SigninGuide from "./SigninGuide";
 
-// Export sidebar content for Search.jsx
 export const sidebarContent = [
   { href: "/", name: "Home", content: "Return to the homepage", icon: Home },
   { href: "/categories", name: "Categories", content: "Browse product categories", icon: Tag },
@@ -33,7 +33,7 @@ export default function SideBar() {
 
   useEffect(() => {
     const handleOpenSidebar = (e) => {
-      const { href, keyword } = e.detail;
+      const { href } = e.detail;
       openSidebar();
       setHighlightedLink(href);
       setTimeout(() => setHighlightedLink(""), 3000);
@@ -46,7 +46,7 @@ export default function SideBar() {
     setIsLineLoading(true);
     try {
       const { default: liff } = await import("@line/liff");
-      if (!liff._liffId) {
+      if (!liff.isInited()) {
         await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
       }
 
@@ -61,13 +61,10 @@ export default function SideBar() {
       if (!result.success) {
         throw new Error(result.message);
       }
-
       closeSidebar();
     } catch (error) {
       console.error("LINE login error:", error);
-      if (!error.message?.includes("redirect")) {
-        toast.error("LINE login failed. Please try again.");
-      }
+      toast.error("LINE login failed. Please try again.");
     } finally {
       setIsLineLoading(false);
     }
