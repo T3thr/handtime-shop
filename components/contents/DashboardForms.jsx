@@ -1237,5 +1237,3 @@ export const DeleteConfirmationModal = ({
     </AnimatePresence>
   );
 };
-  );
-};
