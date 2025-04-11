@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { FaTimes, FaUpload, FaTrash, FaPlus, FaCheck, FaExclamationTriangle, FaTag, FaBoxOpen, FaStar } from "react-icons/fa";
 import { addProduct, updateProduct, addCategory, updateCategory } from "@/backend/lib/dashboardAction";
 
-export const ProductFormModal = ({ isOpen, onClose, product = null, categories = [] }) => {
+export const ProductFormModal = ({ isOpen, onClose, product = null, categories = [], onSuccess }) => {
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -62,7 +62,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
         categories: product.categories || [],
         tags: product.tags || [],
         status: product.status || "active",
-        images: product.images || [],
+        images: Array.isArray(product.images) ? product.images : [],
         seoTitle: product.seoTitle || "",
         seoDescription: product.seoDescription || "",
         shortDescription: product.shortDescription || "",
@@ -74,6 +74,8 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
       initialFormDataRef.current = JSON.stringify(initialData);
       if (product.images && product.images.length > 0) {
         setImagePreviewUrls(product.images.map(img => img.url));
+      } else {
+        setImagePreviewUrls([]);
       }
     } else {
       const initialData = {
@@ -164,7 +166,13 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
         throw new Error(errorData.error || "Failed to upload image");
       }
       const data = await response.json();
-      return { url: data.url, public_id: data.public_id };
+      return { 
+        url: data.url, 
+        public_id: data.public_id,
+        width: data.width,
+        height: data.height,
+        format: data.format
+      };
     } catch (error) {
       console.error("Image upload error:", error);
       toast.error(`Failed to upload image: ${error.message}`);
@@ -178,44 +186,60 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
 
     const newImageFiles = [...imageFiles, ...files];
     setImageFiles(newImageFiles);
-    const newPreviewUrls = [...imagePreviewUrls];
-    const newImages = [...formData.images];
-
-    for (const file of files) {
-      try {
+    
+    // Show loading state
+    toast.info("Uploading images...", { autoClose: false, toastId: "image-upload" });
+    
+    try {
+      for (const file of files) {
+        // Add temporary preview
         const reader = new FileReader();
         reader.onloadend = () => {
-          newPreviewUrls.push(reader.result);
-          setImagePreviewUrls([...newPreviewUrls]);
+          setImagePreviewUrls(prev => [...prev, reader.result]);
         };
         reader.readAsDataURL(file);
 
+        // Upload to Cloudinary
         const uploadedImage = await uploadImageToCloudinary(file);
-        newImages.push(uploadedImage);
-        setFormData(prev => ({ ...prev, images: newImages }));
-      } catch (error) {
-        continue;
+        
+        // Update form data with the new image
+        setFormData(prev => ({
+          ...prev,
+          images: [...prev.images, uploadedImage]
+        }));
       }
+      
+      // Update toast to success
+      toast.update("image-upload", { 
+        render: "Images uploaded successfully!", 
+        type: toast.TYPE.SUCCESS,
+        autoClose: 3000
+      });
+    } catch (error) {
+      // Update toast to error
+      toast.update("image-upload", { 
+        render: "Failed to upload some images", 
+        type: toast.TYPE.ERROR,
+        autoClose: 3000
+      });
     }
   };
 
   const handleRemoveImage = (index) => {
+    // Create copies of the arrays
     const newImages = [...formData.images];
     const newPreviewUrls = [...imagePreviewUrls];
-    const newImageFiles = [...imageFiles];
-
+    
+    // Remove the image at the specified index
     if (index < newImages.length) {
       newImages.splice(index, 1);
       setFormData(prev => ({ ...prev, images: newImages }));
     }
-
-    newPreviewUrls.splice(index, 1);
-    setImagePreviewUrls(newPreviewUrls);
-
-    if (index >= formData.images.length && newImageFiles.length > 0) {
-      const fileIndex = index - formData.images.length;
-      newImageFiles.splice(fileIndex, 1);
-      setImageFiles(newImageFiles);
+    
+    // Remove the preview URL
+    if (index < newPreviewUrls.length) {
+      newPreviewUrls.splice(index, 1);
+      setImagePreviewUrls(newPreviewUrls);
     }
   };
 
@@ -248,6 +272,9 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
 
     setIsSubmitting(true);
     try {
+      // Ensure images array contains valid objects with URLs
+      const validImages = formData.images.filter(img => img && img.url);
+      
       const productData = {
         ...formData,
         price: parseFloat(formData.price),
@@ -255,6 +282,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
         costPerItem: formData.costPerItem ? parseFloat(formData.costPerItem) : null,
         quantity: formData.trackQuantity ? parseInt(formData.quantity) : null,
         weight: formData.weight ? parseFloat(formData.weight) : null,
+        images: validImages
       };
 
       if (product) {
@@ -265,10 +293,16 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
 
       setHasUnsavedChanges(false);
       localStorage.removeItem('productFormAutoSave');
+      
+      // Call onSuccess callback if provided
+      if (typeof onSuccess === 'function') {
+        onSuccess();
+      }
+      
       onClose();
     } catch (error) {
       console.error("Error saving product:", error);
-      //toast.error("Failed to save product. Please try again.");
+      toast.error("Failed to save product. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -688,7 +722,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         name="type"
                         value={formData.type}
                         onChange={handleChange}
-                        placeholder="e.g., Electronics, Clothing"
+                        placeholder="e.g., Watch, Accessory"
                         className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                     </div>
@@ -699,16 +733,16 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         name="vendor"
                         value={formData.vendor}
                         onChange={handleChange}
-                        placeholder="e.g., Apple, Nike"
+                        placeholder="e.g., Rolex, Seiko"
                         className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                     </div>
                   </div>
                 </div>
-                {/* 
+
                 <div className="md:col-span-2">
                   <h3 className="text-lg font-medium text-text-primary mb-4">SEO</h3>
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-4">
                     <div>
                       <label className="block text-text-secondary mb-1">SEO Title</label>
                       <input
@@ -716,7 +750,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         name="seoTitle"
                         value={formData.seoTitle}
                         onChange={handleChange}
-                        placeholder="SEO optimized title (appears in search results)"
+                        placeholder="SEO optimized title (leave blank to use product name)"
                         className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                     </div>
@@ -726,14 +760,13 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         name="seoDescription"
                         value={formData.seoDescription}
                         onChange={handleChange}
-                        placeholder="Brief description for search engines"
+                        placeholder="SEO meta description (leave blank to use short description)"
                         rows={2}
                         className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                     </div>
                   </div>
                 </div>
-                */}
               </div>
 
               <div className="mt-8 flex justify-end space-x-4">
@@ -775,7 +808,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
   );
 };
 
-export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
+export const CategoryFormModal = ({ isOpen, onClose, category = null, onSuccess }) => {
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -786,12 +819,11 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState("");
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [mainCategoriesCount, setMainCategoriesCount] = useState(0);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const initialFormDataRef = useRef(null);
   const modalRef = useRef(null);
 
-  // Fetch existing main categories count
   useEffect(() => {
     const fetchMainCategories = async () => {
       try {
@@ -881,7 +913,13 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
         throw new Error(errorData.error || "Failed to upload image");
       }
       const data = await response.json();
-      return { url: data.url, public_id: data.public_id };
+      return { 
+        url: data.url, 
+        public_id: data.public_id,
+        width: data.width,
+        height: data.height,
+        format: data.format
+      };
     } catch (error) {
       console.error("Image upload error:", error);
       toast.error(`Failed to upload image: ${error.message}`);
@@ -893,15 +931,34 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    // Show temporary preview
     const reader = new FileReader();
     reader.onloadend = () => setImagePreview(reader.result);
     reader.readAsDataURL(file);
 
+    // Show loading state
+    toast.info("Uploading image...", { autoClose: false, toastId: "category-image-upload" });
+
     try {
       const uploadedImage = await uploadImageToCloudinary(file);
       setFormData(prev => ({ ...prev, image: uploadedImage }));
+      
+      // Update toast to success
+      toast.update("category-image-upload", { 
+        render: "Image uploaded successfully!", 
+        type: toast.TYPE.SUCCESS,
+        autoClose: 3000
+      });
     } catch (error) {
+      // Revert to previous image if upload fails
       setImagePreview(formData.image.url || "");
+      
+      // Update toast to error
+      toast.update("category-image-upload", { 
+        render: "Failed to upload image", 
+        type: toast.TYPE.ERROR,
+        autoClose: 3000
+      });
     }
   };
 
@@ -931,9 +988,10 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
 
     setIsSubmitting(true);
     try {
+      // Ensure image is properly formatted
       const categoryData = {
         ...formData,
-        image: formData.image.url ? formData.image : null
+        image: formData.image && formData.image.url ? formData.image : null
       };
 
       if (category) {
@@ -952,10 +1010,16 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
 
       setHasUnsavedChanges(false);
       localStorage.removeItem('categoryFormAutoSave');
+      
+      // Call onSuccess callback if provided
+      if (typeof onSuccess === 'function') {
+        onSuccess();
+      }
+      
       onClose();
     } catch (error) {
       console.error("Error saving category:", error);
-      //toast.error(error.message || "Failed to save category.");
+      toast.error(error.message || "Failed to save category.");
     } finally {
       setIsSubmitting(false);
     }
@@ -1084,9 +1148,11 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
                       </button>
                     </div>
                   ) : (
-                    <label className="block w-32 h-32 rounded-lg border-2 border-dashed border-border-primary bg-background hover:bg-background-secondary flex-col items-center justify-center cursor-pointer mb-4">
-                      <FaUpload className="w-8 h-8 text-text-muted mb-2" />
-                      <span className="text-text-muted text-sm text-center">Upload Image</span>
+                    <label className="block w-32 h-32 rounded-lg border-2 border-dashed border-border-primary bg-background hover:bg-background-secondary flex flex-col items-center justify-center cursor-pointer mb-4">
+                      <div className="flex flex-col items-center justify-center">
+                        <FaUpload className="w-8 h-8 text-text-muted mb-2" />
+                        <span className="text-text-muted text-sm text-center">Upload Image</span>
+                      </div>
                       <input
                         type="file"
                         accept="image/*"
@@ -1137,16 +1203,22 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
   );
 };
 
-export const DeleteConfirmationModal = ({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  itemType, 
-  itemName,
-  isDeleting,  // Add this prop to handle loading state from parent
-  error        // Add this prop to handle errors from parent
-}) => {
+export const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemType, itemName }) => {
+  const [isDeleting, setIsDeleting] = useState(false);
   const modalRef = useRef(null);
+
+  const handleConfirm = async () => {
+    setIsDeleting(true);
+    try {
+      await onConfirm();
+      onClose();
+    } catch (error) {
+      console.error(`Error deleting ${itemType.toLowerCase()}:`, error);
+      toast.error(`Failed to delete ${itemType.toLowerCase()}. Please try again.`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const modalVariants = {
     hidden: { opacity: 0, scale: 0.8 },
@@ -1192,13 +1264,6 @@ export const DeleteConfirmationModal = ({
             <p className="text-text-secondary text-center mb-6">
               Are you sure you want to delete {itemType.toLowerCase()} "{itemName}"? This action cannot be undone.
             </p>
-            
-            {error && (
-              <div className="mb-4 p-3 bg-error/10 text-error rounded-lg text-center">
-                {error}
-              </div>
-            )}
-            
             <div className="flex justify-center space-x-4">
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -1214,7 +1279,7 @@ export const DeleteConfirmationModal = ({
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 type="button"
-                onClick={onConfirm}
+                onClick={handleConfirm}
                 className="px-6 py-2 bg-error text-white rounded-lg hover:bg-error-dark transition-colors duration-300 flex items-center"
                 disabled={isDeleting}
               >
@@ -1226,7 +1291,7 @@ export const DeleteConfirmationModal = ({
                 ) : (
                   <>
                     <FaTrash className="mr-2" />
-                    Delete {itemType}
+                    Delete
                   </>
                 )}
               </motion.button>

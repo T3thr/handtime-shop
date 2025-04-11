@@ -110,25 +110,9 @@ export async function DELETE(request, { params }) {
     if (!deletedProduct) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
-    
-    // Emit socket event if needed
-    if (request.socket?.server?.io) {
-      request.socket.server.io.emit("product_deleted", id);
-    }
-    
-    return NextResponse.json({ 
-      success: true,
-      message: "Product deleted successfully",
-      deletedProductId: id 
-    });
+    return NextResponse.json({ message: "Product deleted successfully" });
   } catch (error) {
     console.error("Failed to delete product:", error);
-    return NextResponse.json(
-      { 
-        error: "Failed to delete product",
-        details: error.message 
-      }, 
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to delete product" }, { status: 500 });
   }
 }

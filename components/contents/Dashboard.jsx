@@ -45,7 +45,7 @@ export default function Dashboard({ session }) {
 
   const { addToCart } = useCart();
   const { categories, refetch: refetchCategories } = useCategories();
-  const { products, mutate: refetchProducts } = useProducts();
+  const { products, refetch: refetchProducts } = useProducts();
 
   const searchParams = useSearchParams(); // Added
 
@@ -84,11 +84,11 @@ export default function Dashboard({ session }) {
     try {
       await deleteProduct(deleteItem.id);
       refetchProducts();
+      setIsDeleteModalOpen(false);
       toast.success("Product deleted successfully!");
     } catch (error) {
       console.error("Error deleting product:", error);
-      toast.error("Failed to delete product");
-      throw error;
+      toast.error(error.message || "Failed to delete product");
     }
   };
 
@@ -117,11 +117,11 @@ export default function Dashboard({ session }) {
     try {
       await deleteCategory(deleteItem.id);
       refetchCategories();
+      setIsDeleteModalOpen(false);
       toast.success("Category deleted successfully!");
     } catch (error) {
       console.error("Error deleting category:", error);
-      toast.error("Failed to delete category");
-      throw error;
+      toast.error(error.message || "Failed to delete category");
     }
   };
 
@@ -188,6 +188,8 @@ export default function Dashboard({ session }) {
             onDeleteCategory={handleDeleteCategory}
             products={products}
             categories={categories}
+            refetchProducts={refetchProducts}
+            refetchCategories={refetchCategories}
           />
         );
       case "users":
@@ -246,12 +248,14 @@ export default function Dashboard({ session }) {
         onClose={handleProductFormClose}
         product={selectedProduct}
         categories={categories}
+        onSuccess={refetchProducts}
       />
       
       <CategoryFormModal
         isOpen={isCategoryModalOpen}
         onClose={handleCategoryFormClose}
         category={selectedCategory}
+        onSuccess={refetchCategories}
       />
       
       <DeleteConfirmationModal

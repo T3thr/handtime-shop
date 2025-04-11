@@ -167,7 +167,7 @@ export const useAllOrders = (initialPage = 1, initialLimit = 10, status = "all")
       return response.data;
     } catch (error) {
       console.error("Error updating order status:", error);
-      toast.error("Failed to update order status");
+      //toast.error("Failed to update order status");
       throw error;
     }
   };

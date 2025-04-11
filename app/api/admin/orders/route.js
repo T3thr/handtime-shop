@@ -1,38 +1,37 @@
-import { NextResponse } from 'next/server';
-import dbConnect from '@/backend/lib/mongodb';
-import Order from '@/backend/models/Order';
-import User from '@/backend/models/User';
-import { getServerSession } from 'next-auth/next';
-import { options } from '@/app/api/auth/[...nextauth]/options';
+import { NextResponse } from "next/server";
+import dbConnect from "@/backend/lib/mongodb";
+import Order from "@/backend/models/Order";
+import User from "@/backend/models/User";
+import { getServerSession } from "next-auth/next";
+import { options } from "@/app/api/auth/[...nextauth]/options";
 
 export async function GET(request) {
   const session = await getServerSession(options);
-  if (!session || session.user.role !== 'admin') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!session || session.user.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
+    // Get pagination parameters from URL
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "10");
+    const status = searchParams.get("status") || "all";
+    const skip = (page - 1) * limit;
+
     await dbConnect();
     
-    // Get pagination parameters and filters from URL
-    const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page')) || 1;
-    const limit = parseInt(searchParams.get('limit')) || 10;
-    const status = searchParams.get('status') || 'all';
-    const skip = (page - 1) * limit;
-    
     // Build query based on status filter
-    const query = status !== 'all' ? { status } : {};
+    const query = status !== "all" ? { status } : {};
     
-    // Count total orders for pagination
+    // Get total count for pagination
     const total = await Order.countDocuments(query);
-    const totalPages = Math.ceil(total / limit);
     
-    // Fetch orders with pagination and populate user data
+    // Get paginated orders with populated user data
     const orders = await Order.find(query)
       .populate({
         path: 'userId',
-        select: 'name email avatar',
+        select: 'name email avatar role',
         model: User
       })
       .sort({ createdAt: -1 })
@@ -40,30 +39,58 @@ export async function GET(request) {
       .limit(limit)
       .lean();
     
-    // Process orders to ensure user data is properly formatted
-    const processedOrders = orders.map(order => {
-      // Add user information to the order object
-      const userEmail = order.userId?.email || 'Unknown';
-      const userName = order.userId?.name || order.userName || 'Unknown';
-      const userAvatar = order.userId?.avatar || null;
-      
-      return {
-        ...order,
-        userEmail,
-        userName,
-        userAvatar
-      };
-    });
+    // Calculate total pages
+    const totalPages = Math.ceil(total / limit);
     
     return NextResponse.json({
-      orders: processedOrders,
-      page,
-      limit,
+      orders,
       total,
-      totalPages
+      totalPages,
+      page,
+      limit
     });
   } catch (error) {
-    console.error('Error fetching orders:', error);
+    console.error("Failed to fetch orders:", error);
     return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 });
+  }
+}
+
+// Update order status endpoint
+export async function PUT(request) {
+  const session = await getServerSession(options);
+  if (!session || session.user.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    await dbConnect();
+    const data = await request.json();
+    
+    if (!data.orderId) {
+      return NextResponse.json({ error: "Order ID is required" }, { status: 400 });
+    }
+    
+    const updatedOrder = await Order.findByIdAndUpdate(
+      data.orderId,
+      { 
+        status: data.status,
+        updatedBy: session.user.id,
+        updatedAt: new Date()
+      },
+      { new: true }
+    ).populate({
+      path: 'userId',
+      select: 'name email avatar role',
+      model: User
+    });
+    
+    if (!updatedOrder) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+    
+    return NextResponse.json(updatedOrder);
+  } catch (error) {
+    console.error("Failed to update order:", error);
+    return NextResponse.json({ error: "Failed to update order" }, { status: 500 });
   }
 }
