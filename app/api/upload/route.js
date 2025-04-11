@@ -50,10 +50,14 @@ export async function POST(request) {
       );
     });
 
-    // Return the Cloudinary URL
+    // Return the Cloudinary URL and additional metadata
     return NextResponse.json({
       url: result.secure_url,
       public_id: result.public_id,
+      width: result.width,
+      height: result.height,
+      format: result.format,
+      resource_type: result.resource_type
     });
   } catch (error) {
     console.error('Upload error:', error);

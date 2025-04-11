@@ -389,7 +389,7 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                             initial={{ opacity: 0, scale: 0.95, y: -5 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: -5 }}
-                            className="absolute left-20 z-50 bg-surface-card rounded-lg shadow-lg border border-border-primary py-2 min-w-[180px]"
+                            className="absolute left-20 -mt-24 z-50 bg-surface-card rounded-lg shadow-lg border border-border-primary py-2 min-w-[180px]"
                             style={{
                               background: "var(--surface-card)",
                             }}

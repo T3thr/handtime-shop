@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useCart } from "@/context/CartContext";
 import { Menu, ShoppingCart, Search as SearchIcon } from "lucide-react";
+import { BsPersonLinesFill } from "react-icons/bs";
 import Cart from "./Cart";
 import SideBar from "./SideBar";
 import Search from "./Search";
@@ -40,10 +41,10 @@ export default function NavBar({ children }) {
             <div className="flex items-center">
               <button
                 onClick={openSidebar}
-                className="p-2 hover:bg-container rounded-lg transition-colors"
+                className="p-2 hover:bg-primary bg-primary-10 rounded-full transition-all duration-300 shadow-md hover:scale-105"
                 aria-label="Open menu"
               >
-                <Menu className="h-6 w-6 text-foreground" />
+                <BsPersonLinesFill className="h-6 w-6 text-foreground group-hover:text-white transition-colors" />
               </button>
 
               <Link href="/" className="ml-4 flex-shrink-0" aria-label="Home">

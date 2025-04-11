@@ -340,7 +340,7 @@ export default function Product() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1 }}
-          className="absolute inset-0 bg-gradient-to-br from-background-secondary via-primary-10 to-primary-light-30 dark:from-background-secondary dark:via-primary-20 dark:to-primary-dark-40"
+          className="absolute inset-0 bg-gradient-to-br from-background-secondary via-primary-40 to-primary-light-80 dark:from-background-secondary dark:via-primary-20 dark:to-primary-dark-40"
         >
           <div className="absolute inset-0 bg-[url('/images/pattern.svg')] bg-repeat bg-center opacity-20"></div>
         </motion.div>

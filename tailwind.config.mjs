@@ -49,8 +49,10 @@ export default {
         'border-secondary': 'var(--border-secondary)',
 
         // Color with dim opacity
-        'primary-10': 'rgba(15, 118, 110, 0.4)',
-        'primary-light-30': 'rgba(20, 184, 166, 0.8)',
+        'primary-10': 'rgba(15, 118, 110, 0.1)',
+        'primary-40': 'rgba(15, 118, 110, 0.4)',
+        'primary-light-30': 'rgba(20, 184, 166, 0.3)',
+        'primary-light-80': 'rgba(20, 184, 166, 0.8)',
         'primary-20': 'rgba(15, 118, 110, 0.3)',
         'primary-dark-40': 'rgba(13, 148, 136, 0.7)',
       },

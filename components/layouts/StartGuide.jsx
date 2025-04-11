@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useContext } from "react";
 import { Menu, LogIn, X } from "lucide-react";
+import { BsPersonLinesFill } from "react-icons/bs";
 import AuthContext from "@/context/AuthContext";
 
 export default function StartGuide() {
@@ -101,24 +102,20 @@ export default function StartGuide() {
           
           <div className="flex items-center space-x-3">
             <div className="bg-primary/15 p-2 rounded-full">
-              <Menu className="h-5 w-5 text-primary" />
+              <BsPersonLinesFill className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h3 className="font-medium text-foreground">Click menu to get started</h3>
-              <p className="text-sm text-text-secondary mt-1">Access account features and more</p>
+              <h3 className="font-medium text-foreground">จิ้มที่ปุ่มนี้เพื่มล็อคอิน</h3>
+              <p className="text-sm text-text-secondary mt-1">ล็อคอินเพื่อเริ่มสั่งสินค้า</p>
             </div>
           </div>
           
           <div className="mt-4 flex items-center justify-between text-sm">
-            <div className="flex items-center gap-1.5 text-primary font-medium">
-              <LogIn className="h-4 w-4" />
-              <span>Sign in for full benefits</span>
-            </div>
             <button 
               onClick={handleDismiss}
               className="px-3 py-1 bg-primary/10 hover:bg-primary/20 text-primary rounded-md transition-colors duration-200"
             >
-              Got it
+              รับทราบ
             </button>
           </div>
         </div>

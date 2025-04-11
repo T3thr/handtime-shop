@@ -268,7 +268,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
       onClose();
     } catch (error) {
       console.error("Error saving product:", error);
-      toast.error("Failed to save product. Please try again.");
+      //toast.error("Failed to save product. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -705,7 +705,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                     </div>
                   </div>
                 </div>
-
+                {/* 
                 <div className="md:col-span-2">
                   <h3 className="text-lg font-medium text-text-primary mb-4">SEO</h3>
                   <div className="grid grid-cols-1 gap-4">
@@ -733,6 +733,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                     </div>
                   </div>
                 </div>
+                */}
               </div>
 
               <div className="mt-8 flex justify-end space-x-4">

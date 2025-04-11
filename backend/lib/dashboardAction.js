@@ -133,7 +133,7 @@ export const addProduct = async (productData) => {
     return response.data;
   } catch (error) {
     console.error('Error adding product:', error);
-    toast.error(error.response?.data?.message || 'Failed to add product');
+    //toast.error(error.response?.data?.message || 'Failed to add product');
     throw error;
   }
 };
@@ -146,7 +146,7 @@ export const updateProduct = async (productId, productData) => {
     return response.data;
   } catch (error) {
     console.error('Error updating product:', error);
-    toast.error(error.response?.data?.message || 'Failed to update product');
+    //toast.error(error.response?.data?.message || 'Failed to update product');
     throw error;
   }
 };
@@ -159,7 +159,7 @@ export const deleteProduct = async (productId) => {
     return true;
   } catch (error) {
     console.error('Error deleting product:', error);
-    toast.error(error.response?.data?.message || 'Failed to delete product');
+    //toast.error(error.response?.data?.message || 'Failed to delete product');
     throw error;
   }
 };
@@ -190,7 +190,7 @@ export const useCategories = () => {
     } catch (error) {
       console.error('Error fetching categories:', error);
       setIsError(true);
-      toast.error('Failed to load categories. Please try again.');
+      //toast.error('Failed to load categories. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -216,7 +216,7 @@ export const addCategory = async (categoryData) => {
     return response.data;
   } catch (error) {
     console.error("Error adding category:", error);
-    toast.error(error.response?.data?.error || "Failed to add category");
+    //toast.error(error.response?.data?.error || "Failed to add category");
     throw error;
   }
 };
@@ -229,7 +229,7 @@ export const updateCategory = async (categoryData) => {
     return response.data;
   } catch (error) {
     console.error("Error updating category:", error);
-    toast.error(error.response?.data?.error || "Failed to update category");
+    //toast.error(error.response?.data?.error || "Failed to update category");
     throw error;
   }
 };
@@ -238,13 +238,13 @@ export const updateCategory = async (categoryData) => {
 export const deleteCategory = async (categoryId) => {
   try {
     await axios.delete('/api/admin/category', {
-      data: { _id: categoryId }
+      data: { id: categoryId }
     });
     toast.success('Category deleted successfully!');
     return true;
   } catch (error) {
     console.error('Error deleting category:', error);
-    toast.error(error.response?.data?.message || 'Failed to delete category');
+    //toast.error(error.response?.data?.message || 'Failed to delete category');
     throw error;
   }
 };
@@ -285,7 +285,7 @@ export const useUsers = (initialPage = 1, initialLimit = 10) => {
       } catch (error) {
         console.error('Error fetching users:', error);
         setIsError(true);
-        toast.error('Failed to load users. Please try again.');
+        //toast.error('Failed to load users. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -339,20 +339,28 @@ export const useAllOrders = (initialPage = 1, initialLimit = 10, status = 'all')
       try {
         const response = await axios.get(`/api/admin/orders?page=${pagination.page}&limit=${pagination.limit}&status=${status}`);
         
-        // Ensure we have proper image URLs for items and user avatars
-        const ordersWithImages = response.data.orders.map(order => ({
-          ...order,
-          items: order.items.map(item => ({
+        // Process orders to ensure consistent data format
+        const processedOrders = response.data.orders.map(order => {
+          // Ensure items have proper image URLs
+          const items = Array.isArray(order.items) ? order.items.map(item => ({
             ...item,
             image: item.image || "/images/placeholder.jpg"
-          })),
-          userId: order.userId ? {
-            ...order.userId,
-            avatar: order.userId.avatar || "/images/avatar-placeholder.jpg"
-          } : null
-        }));
+          })) : [];
+          
+          // Handle user data consistently
+          return {
+            ...order,
+            items,
+            // Use the flattened user data from the API
+            userName: order.userName || (order.userId?.name) || "Unknown",
+            userEmail: order.userEmail || (order.userId?.email) || "No email",
+            userId: order.userId || null,
+            // Ensure avatar is accessible in the expected format for the component
+            avatar: order.userAvatar || (order.userId?.avatar) || "/images/avatar-placeholder.jpg"
+          };
+        });
         
-        setOrders(ordersWithImages || []);
+        setOrders(processedOrders || []);
         setPagination({
           page: response.data.page || pagination.page,
           limit: response.data.limit || pagination.limit,
@@ -405,7 +413,7 @@ export const useAllOrders = (initialPage = 1, initialLimit = 10, status = 'all')
       return response.data;
     } catch (error) {
       console.error('Error updating order status:', error);
-      toast.error('Failed to update order status');
+      //toast.error('Failed to update order status');
       throw error;
     }
   };
@@ -421,7 +429,7 @@ export const useAllOrders = (initialPage = 1, initialLimit = 10, status = 'all')
       return true;
     } catch (error) {
       console.error('Error deleting order:', error);
-      toast.error('Failed to delete order');
+      //toast.error('Failed to delete order');
       throw error;
     }
   };
