@@ -1137,22 +1137,16 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
   );
 };
 
-export const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemType, itemName }) => {
-  const [isDeleting, setIsDeleting] = useState(false);
+export const DeleteConfirmationModal = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  itemType, 
+  itemName,
+  isDeleting,  // Add this prop to handle loading state from parent
+  error        // Add this prop to handle errors from parent
+}) => {
   const modalRef = useRef(null);
-
-  const handleConfirm = async () => {
-    setIsDeleting(true);
-    try {
-      await onConfirm();
-      onClose();
-    } catch (error) {
-      console.error(`Error deleting ${itemType.toLowerCase()}:`, error);
-      toast.error(`Failed to delete ${itemType.toLowerCase()}. Please try again.`);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   const modalVariants = {
     hidden: { opacity: 0, scale: 0.8 },
@@ -1198,6 +1192,13 @@ export const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemType, 
             <p className="text-text-secondary text-center mb-6">
               Are you sure you want to delete {itemType.toLowerCase()} "{itemName}"? This action cannot be undone.
             </p>
+            
+            {error && (
+              <div className="mb-4 p-3 bg-error/10 text-error rounded-lg text-center">
+                {error}
+              </div>
+            )}
+            
             <div className="flex justify-center space-x-4">
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -1213,7 +1214,7 @@ export const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemType, 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 type="button"
-                onClick={handleConfirm}
+                onClick={onConfirm}
                 className="px-6 py-2 bg-error text-white rounded-lg hover:bg-error-dark transition-colors duration-300 flex items-center"
                 disabled={isDeleting}
               >
@@ -1234,5 +1235,7 @@ export const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemType, 
         </motion.div>
       </motion.div>
     </AnimatePresence>
+  );
+};
   );
 };
