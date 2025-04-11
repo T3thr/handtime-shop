@@ -15,8 +15,7 @@ import {
   EmptyState,
   OrderStatus
 } from "@/components/contents/DashboardUI";
-import { useProducts, useCategories, useUsers } from "@/backend/lib/dashboardAction";
-import { useAllOrders } from "@/hooks/dashboardHooks";
+import { useProducts, useCategories, useUsers, useAllOrders } from "@/backend/lib/dashboardAction";
 import AllOrderModal from "@/components/contents/AllOrderModal";
 import { toast } from "react-toastify";
 import axios from "axios";
@@ -155,7 +154,7 @@ export const OrderManagement = () => {
       render: (row) => (
         <div className="flex items-center">
           <Avatar 
-            src={row.userId?.avatar}
+            src={row.avatar || row.userAvatar || (row.userId?.avatar)}
             name={row.userName || "Unknown"}
             size="sm"
           />
@@ -467,7 +466,7 @@ export const CategoryManagement = ({ onAddCategory, onEditCategory, onDeleteCate
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            onClick={() => onDeleteCategory(row.slug)}
+            onClick={() => onDeleteCategory(row._id)}
             className="p-2 text-error hover:bg-error/10 rounded-full transition-colors duration-200"
           >
             <FaTrash className="w-4 h-4" />
@@ -480,7 +479,7 @@ export const CategoryManagement = ({ onAddCategory, onEditCategory, onDeleteCate
   return (
     <Card>
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-        <h3 className="text-lg font-medium text-text-primary mb-4 md:mb-0">Categories</h3>
+        <h3 className="text-lg font-medium text-text-primary mb-4 md:mb-0">All Categories</h3>
         <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
           <div className="relative">
             <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted" />
@@ -493,12 +492,12 @@ export const CategoryManagement = ({ onAddCategory, onEditCategory, onDeleteCate
             />
           </div>
           <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={onAddCategory}
-            className="px-4 py-2 bg-primary text-text-inverted rounded-lg hover:bg-primary-dark transition-colors duration-300 shadow-md"
+            className="px-4 py-2 bg-primary text-text-inverted rounded-lg hover:bg-primary-dark transition-colors duration-300 flex items-center justify-center"
           >
-            Add Category
+            <FaPlus className="mr-2" /> Add Category
           </motion.button>
         </div>
       </div>
@@ -508,6 +507,339 @@ export const CategoryManagement = ({ onAddCategory, onEditCategory, onDeleteCate
         data={sortedAndFilteredCategories} 
         emptyMessage="No categories found."
       />
+    </Card>
+  );
+};
+
+// Product Management Component
+export const ProductManagement = ({ onAddProduct, onEditProduct, onDeleteProduct }) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortField, setSortField] = useState("createdAt");
+  const [sortDirection, setSortDirection] = useState("desc");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  
+  const { 
+    products, 
+    isLoading: productsLoading, 
+    isError: productsError,
+    pagination,
+    changePage,
+    changeLimit
+  } = useProducts(currentPage, itemsPerPage);
+  
+  const { 
+    categories, 
+    isLoading: categoriesLoading, 
+    isError: categoriesError 
+  } = useCategories();
+  
+  const isLoading = productsLoading || categoriesLoading;
+  const isError = productsError || categoriesError;
+  
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+  
+  const getSortIcon = (field) => {
+    if (sortField !== field) return <FaSort className="ml-1 text-text-muted" />;
+    return sortDirection === "asc" ? (
+      <FaSortUp className="ml-1 text-primary" />
+    ) : (
+      <FaSortDown className="ml-1 text-primary" />
+    );
+  };
+  
+  const handleCategoryFilterChange = (e) => {
+    setCategoryFilter(e.target.value);
+    setCurrentPage(1); // Reset to first page when changing filter
+  };
+  
+  const handleStatusFilterChange = (e) => {
+    setStatusFilter(e.target.value);
+    setCurrentPage(1); // Reset to first page when changing filter
+  };
+  
+  // Filter and sort products
+  const sortedAndFilteredProducts = React.useMemo(() => {
+    if (!products) return [];
+    
+    return [...products]
+      .filter((product) => {
+        // Filter by search term
+        const searchFields = [
+          product.name,
+          product.description,
+          product.sku || "",
+        ];
+        
+        const matchesSearch = searchTerm === "" || searchFields.some(field => 
+          field.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        
+        // Filter by category
+        const matchesCategory = categoryFilter === "" || 
+          (product.categories && product.categories.includes(categoryFilter));
+        
+        // Filter by status
+        const matchesStatus = statusFilter === "all" || product.status === statusFilter;
+        
+        return matchesSearch && matchesCategory && matchesStatus;
+      })
+      .sort((a, b) => {
+        if (sortField === "price") {
+          return sortDirection === "asc" 
+            ? a.price - b.price 
+            : b.price - a.price;
+        }
+        
+        if (sortField === "createdAt") {
+          return sortDirection === "asc" 
+            ? new Date(a.createdAt) - new Date(b.createdAt) 
+            : new Date(b.createdAt) - new Date(a.createdAt);
+        }
+        
+        const aValue = a[sortField] || "";
+        const bValue = b[sortField] || "";
+        
+        if (typeof aValue === "string" && typeof bValue === "string") {
+          return sortDirection === "asc" 
+            ? aValue.localeCompare(bValue) 
+            : bValue.localeCompare(aValue);
+        }
+        
+        return 0;
+      });
+  }, [products, searchTerm, categoryFilter, statusFilter, sortField, sortDirection]);
+  
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+  
+  if (isError) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-error mb-4">Failed to load products</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-primary text-text-inverted rounded-lg hover:bg-primary-dark transition-colors duration-300"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+  
+  const columns = [
+    { 
+      header: (
+        <div className="flex items-center cursor-pointer" onClick={() => handleSort("name")}>
+          Product {getSortIcon("name")}
+        </div>
+      ),
+      accessor: "name", 
+      render: (row) => (
+        <div className="flex items-center">
+          <div className="w-10 h-10 mr-3 rounded-md overflow-hidden bg-background-secondary">
+            {row.images && row.images.length > 0 ? (
+              <Image 
+                src={row.images[0].url} 
+                alt={row.name} 
+                width={40} 
+                height={40} 
+                className="object-cover" 
+                unoptimized // For Cloudinary URLs
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <FaBox className="text-text-muted" />
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="font-medium text-text-primary">{row.name}</div>
+            <div className="text-xs text-text-muted">
+              {row.sku ? `SKU: ${row.sku}` : "No SKU"}
+            </div>
+          </div>
+        </div>
+      )
+    },
+    { 
+      header: (
+        <div className="flex items-center cursor-pointer" onClick={() => handleSort("price")}>
+          Price {getSortIcon("price")}
+        </div>
+      ),
+      accessor: "price",
+      render: (row) => (
+        <div>
+          <div className="font-medium">฿{row.price.toFixed(2)}</div>
+          {row.compareAtPrice > 0 && (
+            <div className="text-xs text-text-muted line-through">
+              ฿{row.compareAtPrice.toFixed(2)}
+            </div>
+          )}
+        </div>
+      )
+    },
+    { 
+      header: "Category",
+      accessor: "categories",
+      render: (row) => (
+        <div className="flex flex-wrap gap-1">
+          {row.categories && row.categories.length > 0 ? (
+            row.categories.slice(0, 2).map((category, index) => (
+              <Badge key={index} color="primary" className="text-xs">
+                {category}
+              </Badge>
+            ))
+          ) : (
+            <span className="text-text-muted text-xs">No category</span>
+          )}
+          {row.categories && row.categories.length > 2 && (
+            <Badge color="secondary" className="text-xs">
+              +{row.categories.length - 2}
+            </Badge>
+          )}
+        </div>
+      )
+    },
+    { 
+      header: (
+        <div className="flex items-center cursor-pointer" onClick={() => handleSort("status")}>
+          Status {getSortIcon("status")}
+        </div>
+      ),
+      accessor: "status",
+      render: (row) => (
+        <Badge 
+          color={
+            row.status === "active" 
+              ? "success" 
+              : row.status === "draft" 
+                ? "warning" 
+                : "error"
+          }
+        >
+          {row.status === "active" 
+            ? "Active" 
+            : row.status === "draft" 
+              ? "Draft" 
+              : "Discontinued"}
+        </Badge>
+      )
+    },
+    { 
+      header: "Actions", 
+      accessor: "actions",
+      align: "right",
+      render: (row) => (
+        <div className="flex items-center justify-end space-x-2">
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => onEditProduct(row)}
+            className="p-2 text-info hover:bg-info/10 rounded-full transition-colors duration-200"
+          >
+            <FaEdit className="w-4 h-4" />
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => onDeleteProduct(row._id)}
+            className="p-2 text-error hover:bg-error/10 rounded-full transition-colors duration-200"
+          >
+            <FaTrash className="w-4 h-4" />
+          </motion.button>
+        </div>
+      )
+    },
+  ];
+  
+  return (
+    <Card>
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+        <h3 className="text-lg font-medium text-text-primary mb-4 md:mb-0">All Products</h3>
+        <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+          <div className="relative">
+            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted" />
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 w-full sm:w-64 bg-background rounded-lg border border-border-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </div>
+          <div className="flex space-x-2">
+            <div className="relative">
+              <select
+                value={categoryFilter}
+                onChange={handleCategoryFilterChange}
+                className="pl-4 pr-10 py-2 bg-background rounded-lg border border-border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 appearance-none"
+              >
+                <option value="">All Categories</option>
+                {categories.map((category) => (
+                  <option key={category._id} value={category.name}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+              <FaChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-muted pointer-events-none" />
+            </div>
+            <div className="relative">
+              <select
+                value={statusFilter}
+                onChange={handleStatusFilterChange}
+                className="pl-4 pr-10 py-2 bg-background rounded-lg border border-border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 appearance-none"
+              >
+                <option value="all">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="draft">Draft</option>
+                <option value="discontinued">Discontinued</option>
+              </select>
+              <FaChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-muted pointer-events-none" />
+            </div>
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={onAddProduct}
+            className="px-4 py-2 bg-primary text-text-inverted rounded-lg hover:bg-primary-dark transition-colors duration-300 flex items-center justify-center"
+          >
+            <FaPlus className="mr-2" /> Add Product
+          </motion.button>
+        </div>
+      </div>
+      
+      <DataTable 
+        columns={columns} 
+        data={sortedAndFilteredProducts} 
+        emptyMessage="No products found."
+      />
+      
+      <div className="mt-4 flex justify-between items-center">
+        <div className="text-sm text-text-muted">
+          Showing {sortedAndFilteredProducts.length} of {pagination.total} products
+        </div>
+        <Pagination 
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          onPageChange={changePage}
+        />
+      </div>
     </Card>
   );
 };
@@ -824,10 +1156,18 @@ export const UserManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState("name");
   const [sortDirection, setSortDirection] = useState("asc");
+  const [roleFilter, setRoleFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   
-  const { users, isLoading, isError, pagination, changePage } = useUsers(currentPage, itemsPerPage);
+  const { 
+    users, 
+    isLoading, 
+    isError, 
+    pagination, 
+    changePage, 
+    changeLimit 
+  } = useUsers(currentPage, itemsPerPage);
   
   const handleSort = (field) => {
     if (sortField === field) {
@@ -847,110 +1187,60 @@ export const UserManagement = () => {
     );
   };
   
+  const handleRoleFilterChange = (e) => {
+    setRoleFilter(e.target.value);
+    setCurrentPage(1); // Reset to first page when changing filter
+  };
+  
   // Filter and sort users
   const sortedAndFilteredUsers = React.useMemo(() => {
     if (!users) return [];
     
     return [...users]
-      .filter((user) => 
-        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (user.username && user.username.toLowerCase().includes(searchTerm.toLowerCase()))
-      )
+      .filter((user) => {
+        // Filter by search term
+        const searchFields = [
+          user.name,
+          user.email || "",
+          user.username || "",
+        ];
+        
+        const matchesSearch = searchTerm === "" || searchFields.some(field => 
+          field.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        
+        // Filter by role
+        const matchesRole = roleFilter === "all" || user.role === roleFilter;
+        
+        return matchesSearch && matchesRole;
+      })
       .sort((a, b) => {
-        if (!a[sortField] || !b[sortField]) return 0;
+        if (sortField === "lastLogin") {
+          if (!a.lastLogin) return sortDirection === "asc" ? 1 : -1;
+          if (!b.lastLogin) return sortDirection === "asc" ? -1 : 1;
+          return sortDirection === "asc" 
+            ? new Date(a.lastLogin) - new Date(b.lastLogin) 
+            : new Date(b.lastLogin) - new Date(a.lastLogin);
+        }
         
-        const aValue = typeof a[sortField] === "string" ? a[sortField].toLowerCase() : a[sortField];
-        const bValue = typeof b[sortField] === "string" ? b[sortField].toLowerCase() : b[sortField];
+        if (sortField === "createdAt") {
+          return sortDirection === "asc" 
+            ? new Date(a.createdAt) - new Date(b.createdAt) 
+            : new Date(b.createdAt) - new Date(a.createdAt);
+        }
         
-        if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
-        if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+        const aValue = a[sortField] || "";
+        const bValue = b[sortField] || "";
+        
+        if (typeof aValue === "string" && typeof bValue === "string") {
+          return sortDirection === "asc" 
+            ? aValue.localeCompare(bValue) 
+            : bValue.localeCompare(aValue);
+        }
+        
         return 0;
       });
-  }, [users, searchTerm, sortField, sortDirection]);
-  
-  const userColumns = [
-    { 
-      header: (
-        <div className="flex items-center cursor-pointer" onClick={() => handleSort("name")}>
-          Name {getSortIcon("name")}
-        </div>
-      ),
-      accessor: "name", 
-      render: (row) => (
-        <div className="flex items-center">
-          <Avatar 
-            src={row.avatar}
-            name={row.name}
-            size="md"
-          />
-          <div className="ml-3">
-            <div className="font-medium text-text-primary">{row.name}</div>
-            <div className="text-xs text-text-muted">{row.username || row.email || "No contact info"}</div>
-          </div>
-        </div>
-      )
-    },
-    { 
-      header: (
-        <div className="flex items-center cursor-pointer" onClick={() => handleSort("role")}>
-          Role {getSortIcon("role")}
-        </div>
-      ),
-      accessor: "role",
-      render: (row) => (
-        <Badge 
-          color={row.role === "admin" ? "error" : row.role === "moderator" ? "warning" : "primary"}
-        >
-          {row.role}
-        </Badge>
-      )
-    },
-    { 
-      header: (
-        <div className="flex items-center cursor-pointer" onClick={() => handleSort("stats.totalOrders")}>
-          Orders {getSortIcon("stats.totalOrders")}
-        </div>
-      ),
-      accessor: "stats.totalOrders",
-      render: (row) => <span>{row.stats?.totalOrders || 0}</span>
-    },
-    { 
-      header: (
-        <div className="flex items-center cursor-pointer" onClick={() => handleSort("stats.totalSpent")}>
-          Total Spent {getSortIcon("stats.totalSpent")}
-        </div>
-      ),
-      accessor: "stats.totalSpent",
-      render: (row) => <span>฿{(row.stats?.totalSpent || 0).toFixed(2)}</span>
-    },
-    { 
-      header: (
-        <div className="flex items-center cursor-pointer" onClick={() => handleSort("lastLogin")}>
-          Last Login {getSortIcon("lastLogin")}
-        </div>
-      ),
-      accessor: "lastLogin",
-      render: (row) => <span>{row.lastLogin ? new Date(row.lastLogin).toLocaleDateString() : "Never"}</span>
-    },
-    { 
-      header: "Actions", 
-      accessor: "actions",
-      align: "right",
-      render: (row) => (
-        <div className="flex items-center justify-end space-x-2">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => {}}
-            className="p-2 text-info hover:bg-info/10 rounded-full transition-colors duration-200"
-          >
-            <FaEdit className="w-4 h-4" />
-          </motion.button>
-        </div>
-      )
-    },
-  ];
+  }, [users, searchTerm, roleFilter, sortField, sortDirection]);
   
   if (isLoading) {
     return (
@@ -974,24 +1264,146 @@ export const UserManagement = () => {
     );
   }
   
+  const columns = [
+    { 
+      header: (
+        <div className="flex items-center cursor-pointer" onClick={() => handleSort("name")}>
+          User {getSortIcon("name")}
+        </div>
+      ),
+      accessor: "name", 
+      render: (row) => (
+        <div className="flex items-center">
+          <Avatar 
+            src={row.avatar}
+            name={row.name}
+            size="md"
+          />
+          <div className="ml-3">
+            <div className="font-medium text-text-primary">{row.name}</div>
+            <div className="text-xs text-text-muted">{row.email || "No email"}</div>
+          </div>
+        </div>
+      )
+    },
+    { 
+      header: (
+        <div className="flex items-center cursor-pointer" onClick={() => handleSort("username")}>
+          Username {getSortIcon("username")}
+        </div>
+      ),
+      accessor: "username",
+      render: (row) => (
+        <span className="text-text-secondary">
+          {row.username || "N/A"}
+        </span>
+      )
+    },
+    { 
+      header: (
+        <div className="flex items-center cursor-pointer" onClick={() => handleSort("role")}>
+          Role {getSortIcon("role")}
+        </div>
+      ),
+      accessor: "role",
+      render: (row) => (
+        <Badge 
+          color={
+            row.role === "admin" 
+              ? "error" 
+              : row.role === "moderator" 
+                ? "warning" 
+                : "primary"
+          }
+        >
+          {row.role.charAt(0).toUpperCase() + row.role.slice(1)}
+        </Badge>
+      )
+    },
+    { 
+      header: (
+        <div className="flex items-center cursor-pointer" onClick={() => handleSort("lastLogin")}>
+          Last Login {getSortIcon("lastLogin")}
+        </div>
+      ),
+      accessor: "lastLogin",
+      render: (row) => (
+        <span className="text-text-secondary">
+          {row.lastLogin ? new Date(row.lastLogin).toLocaleDateString() : "Never"}
+        </span>
+      )
+    },
+    { 
+      header: (
+        <div className="flex items-center cursor-pointer" onClick={() => handleSort("stats.totalOrders")}>
+          Orders {getSortIcon("stats.totalOrders")}
+        </div>
+      ),
+      accessor: "stats.totalOrders",
+      render: (row) => (
+        <span className="text-text-secondary">
+          {row.stats?.totalOrders || 0}
+        </span>
+      )
+    },
+    { 
+      header: "Actions", 
+      accessor: "actions",
+      align: "right",
+      render: (row) => (
+        <div className="flex items-center justify-end space-x-2">
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            className="p-2 text-info hover:bg-info/10 rounded-full transition-colors duration-200"
+          >
+            <FaEdit className="w-4 h-4" />
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            className="p-2 text-primary hover:bg-primary/10 rounded-full transition-colors duration-200"
+          >
+            <FaInfoCircle className="w-4 h-4" />
+          </motion.button>
+        </div>
+      )
+    },
+  ];
+  
   return (
     <Card>
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-        <h3 className="text-lg font-medium text-text-primary mb-4 md:mb-0">Users</h3>
-        <div className="relative">
-          <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted" />
-          <input
-            type="text"
-            placeholder="Search users..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 pr-4 py-2 w-full sm:w-64 bg-background rounded-lg border border-border-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
+        <h3 className="text-lg font-medium text-text-primary mb-4 md:mb-0">All Users</h3>
+        <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+          <div className="relative">
+            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted" />
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 w-full sm:w-64 bg-background rounded-lg border border-border-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </div>
+          <div className="relative">
+            <select
+              value={roleFilter}
+              onChange={handleRoleFilterChange}
+              className="pl-4 pr-10 py-2 w-full bg-background rounded-lg border border-border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 appearance-none"
+            >
+              <option value="all">All Roles</option>
+              <option value="admin">Admin</option>
+              <option value="moderator">Moderator</option>
+              <option value="user">User</option>
+            </select>
+            <FaChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-muted pointer-events-none" />
+          </div>
         </div>
       </div>
       
       <DataTable 
-        columns={userColumns} 
+        columns={columns} 
         data={sortedAndFilteredUsers} 
         emptyMessage="No users found."
       />
@@ -1009,3 +1421,17 @@ export const UserManagement = () => {
     </Card>
   );
 };
+
+// Missing FaPlus component
+const FaPlus = (props) => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    viewBox="0 0 448 512" 
+    fill="currentColor" 
+    className={props.className}
+    width={props.width || "1em"}
+    height={props.height || "1em"}
+  >
+    <path d="M256 80c0-17.7-14.3-32-32-32s-32 14.3-32 32V224H48c-17.7 0-32 14.3-32 32s14.3 32 32 32H192V432c0 17.7 14.3 32 32 32s32-14.3 32-32V288H400c17.7 0 32-14.3 32-32s-14.3-32-32-32H256V80z"/>
+  </svg>
+);

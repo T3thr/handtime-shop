@@ -1,6 +1,3 @@
-// components/contents/DashboardSection.jsx
-"use client";
-
 import React from "react";
 import { useUserData, useOrders, useWishlist } from "@/hooks/dashboardHooks";
 import {

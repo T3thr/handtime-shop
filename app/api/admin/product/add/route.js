@@ -43,6 +43,7 @@ export async function POST(request) {
     const newProduct = new Product(newProductData);
     await newProduct.save();
     
+    // Return the complete product with its MongoDB _id
     return NextResponse.json(newProduct, { status: 201 });
   } catch (error) {
     console.error("Failed to create product:", error);

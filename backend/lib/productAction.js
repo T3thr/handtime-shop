@@ -27,18 +27,18 @@ export const addProduct = async (productData) => {
   }
 };
 
-export const updateProduct = async (slug, productData) => {
+export const updateProduct = async (productId, productData) => {
   try {
-    const response = await axios.put(`/api/admin/product/${slug}`, productData);
+    const response = await axios.put(`/api/admin/product/${productId}`, productData);
     return response.data;
   } catch (error) {
     throw new Error(error.response?.data?.error || 'Failed to update product');
   }
 };
 
-export const deleteProduct = async (slug) => {
+export const deleteProduct = async (productId) => {
   try {
-    const response = await axios.delete(`/api/admin/product/${slug}`);
+    const response = await axios.delete(`/api/admin/product/${productId}`);
     return response.data;
   } catch (error) {
     throw new Error(error.response?.data?.error || 'Failed to delete product');

@@ -3,9 +3,10 @@ import dbConnect from "@/backend/lib/mongodb";
 import Product from "@/backend/models/Product";
 import { getServerSession } from "next-auth/next";
 import { options } from "@/app/api/auth/[...nextauth]/options";
+import mongoose from "mongoose";
 
 export async function GET(request, { params }) {
-  const { slug } = params;
+  const { id } = params;
   const session = await getServerSession(options);
   if (!session || session.user.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -13,7 +14,13 @@ export async function GET(request, { params }) {
 
   try {
     await dbConnect();
-    const product = await Product.findOne({ slug }).lean();
+    
+    // Validate if the ID is a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "Invalid product ID format" }, { status: 400 });
+    }
+    
+    const product = await Product.findById(id).lean();
     if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
@@ -25,7 +32,7 @@ export async function GET(request, { params }) {
 }
 
 export async function PUT(request, { params }) {
-  const { slug } = params;
+  const { id } = params;
   const session = await getServerSession(options);
   if (!session || session.user.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -33,6 +40,12 @@ export async function PUT(request, { params }) {
 
   try {
     await dbConnect();
+    
+    // Validate if the ID is a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "Invalid product ID format" }, { status: 400 });
+    }
+    
     const productData = await request.json();
 
     // Validate required fields
@@ -43,15 +56,19 @@ export async function PUT(request, { params }) {
       );
     }
 
-    // Check if the new slug is already taken by another product
-    const existingProduct = await Product.findOne({ slug: productData.slug });
-    if (existingProduct && existingProduct._id.toString() !== productData._id) {
+    // Check if the slug is already taken by another product
+    const existingProduct = await Product.findOne({ 
+      slug: productData.slug,
+      _id: { $ne: id } // Exclude the current product
+    });
+    
+    if (existingProduct) {
       return NextResponse.json({ error: "Slug already in use by another product" }, { status: 400 });
     }
 
     // Update the product
-    const updatedProduct = await Product.findOneAndUpdate(
-      { slug },
+    const updatedProduct = await Product.findByIdAndUpdate(
+      id,
       {
         ...productData,
         updatedBy: session.user.id,
@@ -75,7 +92,7 @@ export async function PUT(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
-  const { slug } = params;
+  const { id } = params;
   const session = await getServerSession(options);
   if (!session || session.user.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -83,7 +100,13 @@ export async function DELETE(request, { params }) {
 
   try {
     await dbConnect();
-    const deletedProduct = await Product.findOneAndDelete({ slug });
+    
+    // Validate if the ID is a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "Invalid product ID format" }, { status: 400 });
+    }
+    
+    const deletedProduct = await Product.findByIdAndDelete(id);
     if (!deletedProduct) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }

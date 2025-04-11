@@ -954,7 +954,7 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
       onClose();
     } catch (error) {
       console.error("Error saving category:", error);
-      toast.error(error.message || "Failed to save category.");
+      //toast.error(error.message || "Failed to save category.");
     } finally {
       setIsSubmitting(false);
     }

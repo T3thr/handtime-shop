@@ -43,7 +43,7 @@ export const useProducts = (initialPage = 1, initialLimit = 50) => {
       } catch (error) {
         console.error('Error fetching products:', error);
         setIsError(true);
-        toast.error('Failed to load products. Please try again.');
+        //toast.error('Failed to load products. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -109,7 +109,7 @@ export const useProduct = (productId) => {
       } catch (error) {
         console.error('Error fetching product:', error);
         setIsError(true);
-        toast.error('Failed to load product details. Please try again.');
+        //toast.error('Failed to load product details. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -141,7 +141,7 @@ export const addProduct = async (productData) => {
 // Function to update an existing product
 export const updateProduct = async (productId, productData) => {
   try {
-    const response = await axios.put(`/api/admin/product/${productData.slug}`, productData);
+    const response = await axios.put(`/api/admin/product/${productId}`, productData);
     toast.success('Product updated successfully!');
     return response.data;
   } catch (error) {
@@ -152,9 +152,9 @@ export const updateProduct = async (productId, productData) => {
 };
 
 // Function to delete a product
-export const deleteProduct = async (slug) => {
+export const deleteProduct = async (productId) => {
   try {
-    await axios.delete(`/api/admin/product/${slug}`);
+    await axios.delete(`/api/admin/product/${productId}`);
     toast.success('Product deleted successfully!');
     return true;
   } catch (error) {
@@ -235,10 +235,10 @@ export const updateCategory = async (categoryData) => {
 };
 
 // Function to delete a category
-export const deleteCategory = async (slug) => {
+export const deleteCategory = async (categoryId) => {
   try {
     await axios.delete('/api/admin/category', {
-      data: { slug }
+      data: { _id: categoryId }
     });
     toast.success('Category deleted successfully!');
     return true;

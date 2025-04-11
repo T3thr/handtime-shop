@@ -2,6 +2,7 @@
 "use client";
 import React, { useState, useCallback, useContext, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Menu, User, X, Home, Tag, Sparkles, LogOut, ChevronRight, Settings, Shield, Copy, Eye, EyeOff, Heart } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
@@ -11,13 +12,15 @@ import SignoutModal from "@/components/auth/SignoutModal";
 import { FaLine } from "react-icons/fa";
 import { useSidebar } from "@/context/SidebarContext";
 import SigninGuide from "./SigninGuide";
+import CategoryModal from "@/components/contents/CategoryModal";
+import axios from "axios";
 
 export const sidebarContent = [
   { href: "/", name: "Home", content: "Return to the homepage", icon: Home },
   { href: "/categories", name: "Categories", content: "Browse product categories", icon: Tag },
   { href: "/new-arrivals", name: "New Arrivals", content: "Check out the latest products", icon: Sparkles },
   { href: "/wishlist", name: "Wishlist", content: "View your saved items", icon: Heart },
-  { href: "/account", name: "Account Settings", content: "Manage your account details", icon: Settings },
+  { href: "/account", name: "บัญชีของฉัน", content: "Manage your account details", icon: Settings },
 ];
 
 export default function SideBar() {
@@ -28,10 +31,24 @@ export default function SideBar() {
   const [showUserId, setShowUserId] = useState(false);
   const [showSigninGuide, setShowSigninGuide] = useState(false);
   const [highlightedLink, setHighlightedLink] = useState("");
-
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [categories, setCategories] = useState([]);
   const { user, lineProfile, lineSignIn, adminSignIn, logoutUser, status } = useContext(AuthContext);
+  const router = useRouter();
 
   useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await axios.get("/api/category");
+        setCategories(response.data);
+      } catch (error) {
+        console.error("Failed to load categories:", error);
+        toast.error("Failed to load categories");
+      }
+    };
+
+    fetchCategories();
+
     const handleOpenSidebar = (e) => {
       const { href } = e.detail;
       openSidebar();
@@ -176,12 +193,24 @@ export default function SideBar() {
   const handleGuestClick = () => {
     if (!isAuthenticated) {
       setShowSigninGuide(true);
-      toast.info("Please sign in to access your account settings!", { autoClose: 3000 });
+      toast.info("Please sign in to access your wishlist!", { autoClose: 3000 }); // Updated message
       setTimeout(() => setShowSigninGuide(false), 3000);
     } else {
       closeSidebar();
     }
   };
+
+  // Handle Wishlist click to redirect to /account with wishlist tab
+  const handleWishlistClick = useCallback(() => {
+    router.push("/account?tab=wishlist");
+    closeSidebar();
+  }, [router, closeSidebar]);
+
+  // Handle Categories click to open CategoryModal with fetched categories
+  const handleCategoriesClick = useCallback(() => {
+    setIsCategoryModalOpen(true);
+    closeSidebar();
+  }, [closeSidebar]);
 
   return (
     <>
@@ -230,7 +259,7 @@ export default function SideBar() {
                 <div className="flex-1 overflow-y-auto py-4">
                   <div className="space-y-1 px-3">
                     {sidebarContent
-                      .filter((item) => item.href !== "/account")
+                      .filter((item) => item.href !== "/account" && item.href !== "/wishlist" && item.href !== "/categories")
                       .map(({ href, icon: Icon, name }) => (
                         <Link
                           key={href}
@@ -248,6 +277,51 @@ export default function SideBar() {
                           <ChevronRight className="h-4 w-4 text-text-tertiary group-hover:text-primary" />
                         </Link>
                       ))}
+                    {/* Custom Categories Button */}
+                    <button
+                      onClick={handleCategoriesClick}
+                      className={`w-full flex items-center justify-between space-x-2 px-4 py-3 rounded-lg hover:bg-container transition-colors group ${
+                        highlightedLink === "/categories" ? "highlight" : ""
+                      }`}
+                      data-search-term="categories"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <Tag className="h-5 w-5 text-text-secondary group-hover:text-primary" />
+                        <span className="text-foreground">Categories</span>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-text-tertiary group-hover:text-primary" />
+                    </button>
+                    {/* Custom Wishlist Button */}
+                    {isAuthenticated ? (
+                      <button
+                        onClick={handleWishlistClick}
+                        className={`w-full flex items-center justify-between space-x-2 px-4 py-3 rounded-lg hover:bg-container transition-colors group ${
+                          highlightedLink === "/wishlist" ? "highlight" : ""
+                        }`}
+                        data-search-term="wishlist"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <Heart className="h-5 w-5 text-text-secondary group-hover:text-primary" />
+                          <span className="text-foreground">Wishlist</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-text-tertiary group-hover:text-primary" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleGuestClick}
+                        className={`w-full flex items-center justify-between space-x-2 px-4 py-3 rounded-lg hover:bg-container transition-colors group ${
+                          highlightedLink === "/wishlist" ? "highlight" : ""
+                        }`}
+                        data-search-term="wishlist"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <Heart className="h-5 w-5 text-text-secondary group-hover:text-primary" />
+                          <span className="text-foreground">Wishlist</span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-text-tertiary group-hover:text-primary" />
+                      </button>
+                    )}
+                    {/* Account Settings */}
                     {isAuthenticated ? (
                       <Link
                         href="/account"
@@ -259,7 +333,7 @@ export default function SideBar() {
                       >
                         <div className="flex items-center space-x-3">
                           <Settings className="h-5 w-5 text-text-secondary group-hover:text-primary" />
-                          <span className="text-foreground">Account Settings</span>
+                          <span className="text-foreground">บัญชีของฉัน</span>
                         </div>
                         <ChevronRight className="h-4 w-4 text-text-tertiary group-hover:text-primary" />
                       </Link>
@@ -338,6 +412,14 @@ export default function SideBar() {
         isOpen={isSignoutModalOpen}
         onClose={() => setIsSignoutModalOpen(false)}
         onConfirm={handleLogout}
+      />
+
+      <CategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        categories={categories}
+        onCategorySelect={() => {}}
+        selectedCategories={[]}
       />
     </>
   );

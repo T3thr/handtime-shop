@@ -3,6 +3,7 @@ import dbConnect from "@/backend/lib/mongodb";
 import Category from "@/backend/models/Category";
 import { getServerSession } from "next-auth/next";
 import { options } from "@/app/api/auth/[...nextauth]/options";
+import mongoose from "mongoose";
 
 const verifyAdminSession = async () => {
   const session = await getServerSession(options);
@@ -11,6 +12,20 @@ const verifyAdminSession = async () => {
   }
   return session;
 };
+
+export async function GET(request) {
+  const session = await verifyAdminSession();
+  if (session instanceof NextResponse) return session;
+
+  try {
+    await dbConnect();
+    const categories = await Category.find().sort({ priority: 1, name: 1 }).lean();
+    return NextResponse.json(categories);
+  } catch (error) {
+    console.error("Failed to fetch categories:", error);
+    return NextResponse.json({ error: "Failed to fetch categories" }, { status: 500 });
+  }
+}
 
 export async function POST(request) {
   const session = await verifyAdminSession();
@@ -63,6 +78,16 @@ export async function PUT(request) {
     await dbConnect();
     const data = await request.json();
 
+    // Validate if ID is provided
+    if (!data._id) {
+      return NextResponse.json({ error: "Category ID is required" }, { status: 400 });
+    }
+
+    // Validate if the ID is a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(data._id)) {
+      return NextResponse.json({ error: "Invalid category ID format" }, { status: 400 });
+    }
+
     const slug = data.slug || data.name.toLowerCase().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-");
     const updatedCategory = {
       name: data.name,
@@ -75,7 +100,7 @@ export async function PUT(request) {
 
     // Check "main" priority limit for updates
     if (updatedCategory.priority === "main") {
-      const existingCategory = await Category.findOne({ slug: data.slug });
+      const existingCategory = await Category.findById(data._id);
       if (!existingCategory || existingCategory.priority !== "main") {
         const mainCount = await Category.countDocuments({ priority: "main" });
         if (mainCount >= 4) {
@@ -87,7 +112,7 @@ export async function PUT(request) {
       }
     }
 
-    const category = await Category.findOneAndUpdate({ slug: data.slug }, updatedCategory, { new: true });
+    const category = await Category.findByIdAndUpdate(data._id, updatedCategory, { new: true });
     if (!category) {
       return NextResponse.json({ error: "Category not found" }, { status: 404 });
     }
@@ -109,14 +134,25 @@ export async function DELETE(request) {
 
   try {
     await dbConnect();
-    const { slug } = await request.json();
-    const category = await Category.findOneAndDelete({ slug });
+    const data = await request.json();
+    
+    // Validate if ID is provided
+    if (!data._id) {
+      return NextResponse.json({ error: "Category ID is required" }, { status: 400 });
+    }
+    
+    // Validate if the ID is a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(data._id)) {
+      return NextResponse.json({ error: "Invalid category ID format" }, { status: 400 });
+    }
+    
+    const category = await Category.findByIdAndDelete(data._id);
     if (!category) {
       return NextResponse.json({ error: "Category not found" }, { status: 404 });
     }
 
     if (request.socket?.server?.io) {
-      request.socket.server.io.emit("category_deleted", slug);
+      request.socket.server.io.emit("category_deleted", data._id);
     }
 
     return NextResponse.json({ message: "Category deleted successfully" });

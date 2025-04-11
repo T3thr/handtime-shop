@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/backend/lib/mongodb';
 import Order from '@/backend/models/Order';
+import User from '@/backend/models/User';
 import { getServerSession } from 'next-auth/next';
 import { options } from '@/app/api/auth/[...nextauth]/options';
 
@@ -27,16 +28,35 @@ export async function GET(request) {
     const total = await Order.countDocuments(query);
     const totalPages = Math.ceil(total / limit);
     
-    // Fetch orders with pagination
+    // Fetch orders with pagination and populate user data
     const orders = await Order.find(query)
-      .populate('userId', 'name email avatar')
+      .populate({
+        path: 'userId',
+        select: 'name email avatar',
+        model: User
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
     
+    // Process orders to ensure user data is properly formatted
+    const processedOrders = orders.map(order => {
+      // Add user information to the order object
+      const userEmail = order.userId?.email || 'Unknown';
+      const userName = order.userId?.name || order.userName || 'Unknown';
+      const userAvatar = order.userId?.avatar || null;
+      
+      return {
+        ...order,
+        userEmail,
+        userName,
+        userAvatar
+      };
+    });
+    
     return NextResponse.json({
-      orders,
+      orders: processedOrders,
       page,
       limit,
       total,

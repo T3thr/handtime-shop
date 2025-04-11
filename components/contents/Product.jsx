@@ -140,7 +140,7 @@ export default function Product() {
     }
 
     if (filters.categories.length > 0) {
-      filtered = filtered.filter((p) => filters.categories.every((cat) => p.categories.includes(cat)));
+      filtered = filtered.filter((p) => filters.categories.some((cat) => p.categories.includes(cat)));
     }
 
     if (filters.priceRange) {
@@ -627,311 +627,311 @@ export default function Product() {
                     >
                       <X className="h-3 w-3" />
                     </button>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
+          </div>
 
-            <AnimatePresence>
-              {showFilters && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="mt-3 pt-3 border-t border-border-primary grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 overflow-hidden"
-                >
-                  <div>
-                    <h4 className="text-sm font-medium mb-2 text-text-secondary">Categories</h4>
-                    <div className="flex flex-wrap gap-2">
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="mt-3 pt-3 border-t border-border-primary grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 overflow-hidden"
+              >
+                <div>
+                  <h4 className="text-sm font-medium mb-2 text-text-secondary">Categories</h4>
+                  <div className="flex flex-wrap gap-2">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setFilters((prev) => ({ ...prev, categories: [] }))}
+                      className={`px-3 py-1.5 text-xs rounded-full transition-all duration-200 ${
+                        filters.categories.length === 0
+                          ? "bg-primary text-text-inverted shadow-md shadow-primary/20"
+                          : "bg-surface-card hover:bg-surface-card/80 text-text-secondary"
+                      }`}
+                    >
+                      All
+                    </motion.button>
+                    {categories.map((category) => (
                       <motion.button
+                        key={category.slug}
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={() => setFilters((prev) => ({ ...prev, categories: [] }))}
+                        onClick={() => {
+                          setFilters((prev) => ({
+                            ...prev,
+                            categories: prev.categories.includes(category.name)
+                              ? prev.categories.filter((cat) => cat !== category.name)
+                              : [...prev.categories, category.name],
+                          }));
+                        }}
                         className={`px-3 py-1.5 text-xs rounded-full transition-all duration-200 ${
-                          filters.categories.length === 0
+                          filters.categories.includes(category.name)
                             ? "bg-primary text-text-inverted shadow-md shadow-primary/20"
                             : "bg-surface-card hover:bg-surface-card/80 text-text-secondary"
                         }`}
                       >
-                        All
+                        {category.name}
                       </motion.button>
-                      {categories.map((category) => (
-                        <motion.button
-                          key={category.slug}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => {
-                            setFilters((prev) => ({
-                              ...prev,
-                              categories: prev.categories.includes(category.name)
-                                ? prev.categories.filter((cat) => cat !== category.name)
-                                : [...prev.categories, category.name],
-                            }));
-                          }}
-                          className={`px-3 py-1.5 text-xs rounded-full transition-all duration-200 ${
-                            filters.categories.includes(category.name)
-                              ? "bg-primary text-text-inverted shadow-md shadow-primary/20"
-                              : "bg-surface-card hover:bg-surface-card/80 text-text-secondary"
-                          }`}
-                        >
-                          {category.name}
-                        </motion.button>
-                      ))}
-                    </div>
+                    ))}
                   </div>
-
-                  <div>
-                    <h4 className="text-sm font-medium mb-2 text-text-secondary">Price Range</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {priceRanges.map((range) => (
-                        <motion.button
-                          key={range.value}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => setFilters((prev) => ({ ...prev, priceRange: range.value }))}
-                          className={`px-3 py-1.5 text-xs rounded-full transition-all duration-200 ${
-                            filters.priceRange === range.value
-                              ? "bg-primary text-text-inverted shadow-md shadow-primary/20"
-                              : "bg-surface-card hover:bg-surface-card/80 text-text-secondary"
-                          }`}
-                        >
-                          {range.label}
-                        </motion.button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="col-span-1 sm:col-span-2 lg:col-span-4 flex justify-end">
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => {
-                        setFilters({ categories: [], priceRange: "", sortBy: "", searchQuery: "" });
-                        setShowFilters(false);
-                      }}
-                      className="text-sm text-text-muted hover:text-primary transition-colors duration-200 flex items-center"
-                    >
-                      <X className="w-4 h-4 mr-1" />
-                      Clear All Filters
-                    </motion.button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-
-        {/* Products Section */}
-        <section
-          ref={productsRef}
-          className="py-12 md:py-20 bg-gradient-to-b from-background to-background-secondary/50 dark:from-background dark:to-background-secondary/20"
-        >
-          <div className="container mx-auto max-w-7xl px-4 lg:px-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={productsInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-              transition={{ duration: 0.6 }}
-              className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8"
-            >
-              <div className="space-y-2">
-                <h2 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
-                  {filters.searchQuery || filters.categories.length > 0 ? "Filtered Products" : "Handcrafted Collection"}
-                </h2>
-                <p
-                  className="text-text-secondary"
-                  data-search-term="discover our handpicked artisanal treasures"
-                >
-                  {filters.searchQuery || filters.categories.length > 0 || filters.priceRange
-                    ? `Showing ${displayedProducts.length} result${displayedProducts.length !== 1 ? "s" : ""}`
-                    : "Discover our handpicked artisanal treasures"}
-                </p>
-              </div>
-            </motion.div>
-
-            {displayedProducts.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.5 }}
-                className="py-16 text-center"
-              >
-                <div className="inline-flex justify-center items-center w-16 h-16 mb-6 rounded-full bg-background-secondary">
-                  <Search className="h-8 w-8 text-text-muted" />
                 </div>
-                <h3 className="text-xl font-medium text-text-primary mb-2">No products found</h3>
-                <p
-                  className="text-text-secondary mb-6 max-w-md mx-auto"
-                  data-search-term="we couldn't find any products"
-                >
-                  We couldn't find any products matching your current filters. Try adjusting your search criteria.
-                </p>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setFilters({ categories: [], priceRange: "", sortBy: "", searchQuery: "" })}
-                  className="btn-primary bg-primary hover:bg-primary-dark inline-flex items-center"
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Clear All Filters
-                </motion.button>
-              </motion.div>
-            ) : (
-              <>
-                <motion.div
-                  variants={staggerContainer}
-                  initial="hidden"
-                  animate={productsInView ? "visible" : "hidden"}
-                  className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6"
-                >
-                  {displayedProducts.slice(0, visibleProducts).map((product, index) => (
-                    <motion.div
-                      key={product._id}
-                      id={`product-${product._id}`}
-                      variants={fadeInUp}
-                      transition={{ duration: 0.3, delay: index * 0.05 }}
-                      whileHover={{ y: -5 }}
-                      className="group relative bg-surface-card rounded-xl shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md"
-                    >
-                      <div
-                        className="aspect-square relative overflow-hidden cursor-pointer"
-                        onClick={() => handleProductClick(product)}
+
+                <div>
+                  <h4 className="text-sm font-medium mb-2 text-text-secondary">Price Range</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {priceRanges.map((range) => (
+                      <motion.button
+                        key={range.value}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setFilters((prev) => ({ ...prev, priceRange: range.value }))}
+                        className={`px-3 py-1.5 text-xs rounded-full transition-all duration-200 ${
+                          filters.priceRange === range.value
+                            ? "bg-primary text-text-inverted shadow-md shadow-primary/20"
+                            : "bg-surface-card hover:bg-surface-card/80 text-text-secondary"
+                        }`}
                       >
-                        <Image
-                          src={product.images[0]?.url || "/images/placeholder.jpg"}
-                          alt={product.name}
-                          fill
-                          className="object-cover transition-transform duration-500 group-hover:scale-105"
-                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                        <div className="absolute top-3 right-3">
-                          <button
-                            onClick={(e) => handleWishlist(product._id, e)}
-                            className="p-2 rounded-full bg-surface-card opacity-90 backdrop-blur-sm hover:bg-surface-card transition-colors duration-200"
-                          >
-                            <Heart
-                              className={`w-5 h-5 ${
-                                isProductInWishlist(product._id)
-                                  ? "text-error"
-                                  : "text-text-secondary hover:text-primary"
-                              }`}
-                              fill={isProductInWishlist(product._id) ? "currentColor" : "none"}
-                            />
-                          </button>
-                        </div>
-                        {product.quantity <= 0 && !product.continueSellingWhenOutOfStock && (
-                          <div className="absolute top-0 left-0 w-full bg-error/90 text-text-inverted text-center py-1 text-sm font-medium">
-                            Out of Stock
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="p-5">
-                        <div className="flex justify-between items-start mb-2">
-                          <h3
-                            className="font-medium text-text-primary line-clamp-1 cursor-pointer"
-                            onClick={() => handleProductClick(product)}
-                            data-search-term={product.name.toLowerCase()}
-                          >
-                            {product.name}
-                          </h3>
-                          <span className="font-bold text-primary">฿{product.price.toFixed(2)}</span>
-                        </div>
-                        <p
-                          className="text-sm text-text-muted line-clamp-2 mb-2 min-h-[40px]"
-                          data-search-term={product.shortDescription?.toLowerCase() || product.description.toLowerCase()}
-                        >
-                          {product.shortDescription || product.description}
-                        </p>
-                        <div className="flex items-center mb-4">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`w-4 h-4 ${
-                                i < Math.round(product.averageRating || 0)
-                                  ? "text-warning fill-current"
-                                  : "text-text-muted"
-                              }`}
-                            />
-                          ))}
-                          <span className="ml-2 text-xs text-text-secondary">
-                            ({product.averageRating?.toFixed(1) || "0"})
-                          </span>
-                        </div>
-
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={(e) => handleAddToCart(product, e)}
-                          disabled={product.quantity <= 0 && !product.continueSellingWhenOutOfStock}
-                          className={`w-full flex items-center justify-center px-4 py-2 rounded-full transition-colors duration-200 relative overflow-hidden ${
-                            isProductInCart(product._id)
-                              ? "bg-primary-dark text-text-inverted"
-                              : product.quantity <= 0 && !product.continueSellingWhenOutOfStock
-                              ? "bg-background-secondary text-text-muted cursor-not-allowed"
-                              : "bg-primary text-text-inverted hover:bg-primary-dark"
-                          }`}
-                        >
-                          {isProductInCart(product._id) ? (
-                            <>
-                              <ShoppingBag className="w-4 h-4" />
-                              <span className="text-xs mr-1">{getProductQuantityInCart(product._id)}</span>
-                              <span className="text-sm">In Cart</span>
-                            </>
-                          ) : (
-                            <>
-                              <ShoppingBag className="w-4 h-4 mr-1" />
-                              <span className="text-sm">Add To Cart</span>
-                            </>
-                          )}
-                          {hoverEffects[product._id] && (
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0 }}
-                              className="absolute inset-0 bg-primary-light/30"
-                            />
-                          )}
-                        </motion.button>
-                      </div>
-                    </motion.div>
-                  ))}
-                </motion.div>
-
-                {hasMoreProducts && (
-                  <div className="mt-12 text-center">
-                    <motion.button
-                      whileHover={{ scale: 1.03 }}
-                      whileTap={{ scale: 0.97 }}
-                      onClick={() => setVisibleProducts((prev) => prev + 8)}
-                      className="btn-primary bg-surface-card hover:bg-surface-card/80 border border-border-primary inline-flex items-center text-text-secondary"
-                    >
-                      Load More
-                      <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M19 13l-7 7-7-7m14-8l-7 7-7-7"
-                        ></path>
-                      </svg>
-                    </motion.button>
+                        {range.label}
+                      </motion.button>
+                    ))}
                   </div>
-                )}
+                </div>
 
-                {selectedProduct && (
-                  <ProductModal
-                    product={selectedProduct}
-                    onClose={() => setSelectedProduct(null)}
-                    keyword={selectedProduct.keyword}
-                  />
-                )}
-              </>
+                <div className="col-span-1 sm:col-span-2 lg:col-span-4 flex justify-end">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      setFilters({ categories: [], priceRange: "", sortBy: "", searchQuery: "" });
+                      setShowFilters(false);
+                    }}
+                    className="text-sm text-text-muted hover:text-primary transition-colors duration-200 flex items-center"
+                  >
+                    <X className="w-4 h-4 mr-1" />
+                    Clear All Filters
+                  </motion.button>
+                </div>
+              </motion.div>
             )}
-          </div>
-        </section>
+          </AnimatePresence>
+        </div>
       </div>
-    );
-  }
+
+      {/* Products Section */}
+      <section
+        ref={productsRef}
+        className="py-12 md:py-20 bg-gradient-to-b from-background to-background-secondary/50 dark:from-background dark:to-background-secondary/20"
+      >
+        <div className="container mx-auto max-w-7xl px-4 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={productsInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+            transition={{ duration: 0.6 }}
+            className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8"
+          >
+            <div className="space-y-2">
+              <h2 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
+                {filters.searchQuery || filters.categories.length > 0 ? "Filtered Products" : "Handcrafted Collection"}
+              </h2>
+              <p
+                className="text-text-secondary"
+                data-search-term="discover our handpicked artisanal treasures"
+              >
+                {filters.searchQuery || filters.categories.length > 0 || filters.priceRange
+                  ? `Showing ${displayedProducts.length} result${displayedProducts.length !== 1 ? "s" : ""}`
+                  : "Discover our handpicked artisanal treasures"}
+              </p>
+            </div>
+          </motion.div>
+
+          {displayedProducts.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5 }}
+              className="py-16 text-center"
+            >
+              <div className="inline-flex justify-center items-center w-16 h-16 mb-6 rounded-full bg-background-secondary">
+                <Search className="h-8 w-8 text-text-muted" />
+              </div>
+              <h3 className="text-xl font-medium text-text-primary mb-2">No products found</h3>
+              <p
+                className="text-text-secondary mb-6 max-w-md mx-auto"
+                data-search-term="we couldn't find any products"
+              >
+                We couldn't find any products matching your current filters. Try adjusting your search criteria.
+              </p>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setFilters({ categories: [], priceRange: "", sortBy: "", searchQuery: "" })}
+                className="btn-primary bg-primary hover:bg-primary-dark inline-flex items-center"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Clear All Filters
+              </motion.button>
+            </motion.div>
+          ) : (
+            <>
+              <motion.div
+                variants={staggerContainer}
+                initial="hidden"
+                animate={productsInView ? "visible" : "hidden"}
+                className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6"
+              >
+                {displayedProducts.slice(0, visibleProducts).map((product, index) => (
+                  <motion.div
+                    key={product._id}
+                    id={`product-${product._id}`}
+                    variants={fadeInUp}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                    whileHover={{ y: -5 }}
+                    className="group relative bg-surface-card rounded-xl shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md"
+                  >
+                    <div
+                      className="aspect-square relative overflow-hidden cursor-pointer"
+                      onClick={() => handleProductClick(product)}
+                    >
+                      <Image
+                        src={product.images[0]?.url || "/images/placeholder.jpg"}
+                        alt={product.name}
+                        fill
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <div className="absolute top-3 right-3">
+                        <button
+                          onClick={(e) => handleWishlist(product._id, e)}
+                          className="p-2 rounded-full bg-surface-card opacity-90 backdrop-blur-sm hover:bg-surface-card transition-colors duration-200"
+                        >
+                          <Heart
+                            className={`w-5 h-5 ${
+                              isProductInWishlist(product._id)
+                                ? "text-error"
+                                : "text-text-secondary hover:text-primary"
+                            }`}
+                            fill={isProductInWishlist(product._id) ? "currentColor" : "none"}
+                          />
+                        </button>
+                      </div>
+                      {product.quantity <= 0 && !product.continueSellingWhenOutOfStock && (
+                        <div className="absolute top-0 left-0 w-full bg-error/90 text-text-inverted text-center py-1 text-sm font-medium">
+                          Out of Stock
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-5">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3
+                          className="font-medium text-text-primary line-clamp-1 cursor-pointer"
+                          onClick={() => handleProductClick(product)}
+                          data-search-term={product.name.toLowerCase()}
+                        >
+                          {product.name}
+                        </h3>
+                        <span className="font-bold text-primary">฿{product.price.toFixed(2)}</span>
+                      </div>
+                      <p
+                        className="text-sm text-text-muted line-clamp-2 mb-2 min-h-[40px]"
+                        data-search-term={product.shortDescription?.toLowerCase() || product.description.toLowerCase()}
+                      >
+                        {product.shortDescription || product.description}
+                      </p>
+                      <div className="flex items-center mb-4">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-4 h-4 ${
+                              i < Math.round(product.averageRating || 0)
+                                ? "text-warning fill-current"
+                                : "text-text-muted"
+                            }`}
+                          />
+                        ))}
+                        <span className="ml-2 text-xs text-text-secondary">
+                          ({product.averageRating?.toFixed(1) || "0"})
+                        </span>
+                      </div>
+
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={(e) => handleAddToCart(product, e)}
+                        disabled={product.quantity <= 0 && !product.continueSellingWhenOutOfStock}
+                        className={`w-full flex items-center justify-center px-4 py-2 rounded-full transition-colors duration-200 relative overflow-hidden ${
+                          isProductInCart(product._id)
+                            ? "bg-primary-dark text-text-inverted"
+                            : product.quantity <= 0 && !product.continueSellingWhenOutOfStock
+                            ? "bg-background-secondary text-text-muted cursor-not-allowed"
+                            : "bg-primary text-text-inverted hover:bg-primary-dark"
+                        }`}
+                      >
+                        {isProductInCart(product._id) ? (
+                          <>
+                            <ShoppingBag className="w-4 h-4" />
+                            <span className="text-xs mr-1">{getProductQuantityInCart(product._id)}</span>
+                            <span className="text-sm">In Cart</span>
+                          </>
+                        ) : (
+                          <>
+                            <ShoppingBag className="w-4 h-4 mr-1" />
+                            <span className="text-sm">Add To Cart</span>
+                          </>
+                        )}
+                        {hoverEffects[product._id] && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-primary-light/30"
+                          />
+                        )}
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                ))}
+              </motion.div>
+
+              {hasMoreProducts && (
+                <div className="mt-12 text-center">
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => setVisibleProducts((prev) => prev + 8)}
+                    className="btn-primary bg-surface-card hover:bg-surface-card/80 border border-border-primary inline-flex items-center text-text-secondary"
+                  >
+                    Load More
+                    <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M19 13l-7 7-7-7m14-8l-7 7-7-7"
+                      ></path>
+                    </svg>
+                  </motion.button>
+                </div>
+              )}
+
+              {selectedProduct && (
+                <ProductModal
+                  product={selectedProduct}
+                  onClose={() => setSelectedProduct(null)}
+                  keyword={selectedProduct.keyword}
+                />
+              )}
+            </>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}

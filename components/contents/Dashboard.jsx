@@ -1,10 +1,10 @@
 "use client";
-
-import React from "react";
+import React, { useEffect } from "react"; // Add useEffect
 import { motion } from "framer-motion";
 import { useActiveSection } from "@/hooks/useDashboardState";
 import { useSidebar } from "@/context/SidebarContext";
 import { Sidebar } from "@/components/contents/EnhancedSidebar";
+import { useRouter , useSearchParams } from "next/navigation"; // Add useRouter for query parsing
 import { 
   OverviewSection, 
   OrdersSection, 
@@ -41,33 +41,49 @@ export default function Dashboard({ session }) {
   const [selectedProduct, setSelectedProduct] = React.useState(null);
   const [selectedCategory, setSelectedCategory] = React.useState(null);
   const [deleteItem, setDeleteItem] = React.useState({ type: "", id: "", name: "" });
-  
+  const router = useRouter(); // Add router
+
   const { addToCart } = useCart();
-  const { categories } = useCategories();
-  
+  const { categories, refetch: refetchCategories } = useCategories();
+  const { products, mutate: refetchProducts } = useProducts();
+
+  const searchParams = useSearchParams(); // Added
+
+  // Handle initial section from query parameter
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "wishlist") {
+      setState({ activeSection: "wishlist" });
+      // Clean up the URL to remove the query parameter
+      router.replace("/account", { scroll: false });
+    }
+  }, [searchParams, setState, router]);
+
   const handleAddProduct = () => {
     setSelectedProduct(null);
     setIsProductModalOpen(true);
   };
-  
+
   const handleEditProduct = (product) => {
     setSelectedProduct(product);
     setIsProductModalOpen(true);
   };
-  
-  const handleDeleteProduct = (slug) => {
-    const product = categories.find(p => p.slug === slug);
+
+  const handleDeleteProduct = (productId) => {
+    const product = products?.find(p => p._id === productId) || 
+                   { name: "Unknown Product", _id: productId };
     setDeleteItem({
       type: "Product",
-      id: slug,
-      name: product?.name || slug
+      id: productId,
+      name: product.name || productId
     });
     setIsDeleteModalOpen(true);
   };
-  
+
   const confirmDeleteProduct = async () => {
     try {
       await deleteProduct(deleteItem.id);
+      refetchProducts();
       toast.success("Product deleted successfully!");
     } catch (error) {
       console.error("Error deleting product:", error);
@@ -75,55 +91,68 @@ export default function Dashboard({ session }) {
       throw error;
     }
   };
-  
+
   const handleAddCategory = () => {
     setSelectedCategory(null);
     setIsCategoryModalOpen(true);
   };
-  
+
   const handleEditCategory = (category) => {
     setSelectedCategory(category);
     setIsCategoryModalOpen(true);
   };
-  
-  const handleDeleteCategory = (slug) => {
-    const category = categories.find(c => c.slug === slug);
+
+  const handleDeleteCategory = (categoryId) => {
+    const category = categories?.find(c => c._id === categoryId) || 
+                    { name: "Unknown Category", _id: categoryId };
     setDeleteItem({
       type: "Category",
-      id: slug,
-      name: category?.name || slug
+      id: categoryId,
+      name: category.name || categoryId
     });
     setIsDeleteModalOpen(true);
   };
-  
+
   const confirmDeleteCategory = async () => {
     try {
       await deleteCategory(deleteItem.id);
+      refetchCategories();
+      toast.success("Category deleted successfully!");
     } catch (error) {
       console.error("Error deleting category:", error);
+      toast.error("Failed to delete category");
       throw error;
     }
   };
-  
+
   const handleAddToCart = async (product) => {
     try {
       const cartItem = {
-        id: product.productId,
+        id: product.productId || product._id,
         name: product.name,
         price: product.price,
         description: product.description || "",
-        image: product.image || "/images/placeholder.jpg",
-        category: product.category || "",
+        image: product.image || product.images?.[0]?.url || "/images/placeholder.jpg",
+        category: product.category || product.categories?.[0] || "",
       };
       
       await addToCart(cartItem);
-      //toast.success(`${product.name} added to cart!`);
     } catch (error) {
       console.error("Failed to add to cart:", error);
       toast.error("Failed to add to cart");
     }
   };
-  
+
+  const handleProductFormClose = () => {
+    setIsProductModalOpen(false);
+    refetchProducts();
+  };
+
+  const handleCategoryFormClose = () => {
+    setIsCategoryModalOpen(false);
+    refetchCategories();
+  };
+
   const contentVariants = {
     hidden: { opacity: 0 },
     visible: { 
@@ -135,7 +164,7 @@ export default function Dashboard({ session }) {
       transition: { duration: 0.2 }
     }
   };
-  
+
   const setActiveSection = (section) => setState({ activeSection: section });
 
   const renderSection = () => {
@@ -151,11 +180,14 @@ export default function Dashboard({ session }) {
       case "store":
         return (
           <ManageStore
+            onAddProduct={handleAddProduct}
             onEditProduct={handleEditProduct}
             onDeleteProduct={handleDeleteProduct}
             onAddCategory={handleAddCategory}
             onEditCategory={handleEditCategory}
             onDeleteCategory={handleDeleteCategory}
+            products={products}
+            categories={categories}
           />
         );
       case "users":
@@ -174,6 +206,14 @@ export default function Dashboard({ session }) {
     }
   };
   
+  useEffect(() => {
+    const handleSetActiveSection = (e) => {
+      setActiveSection(e.detail.section);
+    };
+    document.addEventListener("setActiveSection", handleSetActiveSection);
+    return () => document.removeEventListener("setActiveSection", handleSetActiveSection);
+  }, [setActiveSection]);
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar
@@ -203,14 +243,14 @@ export default function Dashboard({ session }) {
       
       <ProductFormModal
         isOpen={isProductModalOpen}
-        onClose={() => setIsProductModalOpen(false)}
+        onClose={handleProductFormClose}
         product={selectedProduct}
         categories={categories}
       />
       
       <CategoryFormModal
         isOpen={isCategoryModalOpen}
-        onClose={() => setIsCategoryModalOpen(false)}
+        onClose={handleCategoryFormClose}
         category={selectedCategory}
       />
       
