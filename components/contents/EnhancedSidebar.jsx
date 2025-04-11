@@ -20,7 +20,7 @@ import {
   FaMoon,
   FaSun,
 } from "react-icons/fa";
-import { MdAdminPanelSettings } from "react-icons/md"; // New admin icon
+import { MdAdminPanelSettings } from "react-icons/md";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import Image from "next/image";
@@ -37,7 +37,7 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   const [showUserId, setShowUserId] = useState(false);
   const { user, lineProfile } = useContext(AuthContext);
-  const adminMenuRef = useRef(null); // Ref for admin dropdown
+  const adminMenuRef = useRef(null);
 
   const handleReturn = () => {
     router.push("/");
@@ -60,7 +60,6 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
     { id: "allOrders", label: "All Orders", icon: FaClipboardList },
   ];
 
-  // Sidebar animation variants
   const sidebarVariants = {
     open: {
       x: 0,
@@ -74,12 +73,10 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
     },
   };
 
-  // Navigation item hover animation
   const navItemVariants = {
     hover: { x: 5, transition: { duration: 0.2 } },
   };
 
-  // Active indicator animation
   const activeIndicatorVariants = {
     inactive: { opacity: 0, scale: 0.5 },
     active: {
@@ -89,7 +86,6 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
     },
   };
 
-  // Handle click outside to close admin menu
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (adminMenuRef.current && !adminMenuRef.current.contains(event.target)) {
@@ -383,10 +379,9 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                         onClick={() => setIsAdminMenuOpen(!isAdminMenuOpen)}
                         className="w-full flex justify-center px-4 py-3 rounded-lg text-text-primary hover:bg-background-secondary hover:text-primary transition-all duration-200"
                       >
-                        <MdAdminPanelSettings className="w-7 h-7" /> 
+                        <MdAdminPanelSettings className="w-7 h-7" />
                       </motion.button>
 
-                      {/* Dropdown for collapsed mode */}
                       <AnimatePresence>
                         {isAdminMenuOpen && (
                           <motion.div
@@ -475,7 +470,7 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
           transition={{ delay: 0.5 }}
         >
           <div className="flex flex-col space-y-2">
-          <motion.button
+            <motion.button
               whileHover="hover"
               variants={navItemVariants}
               onClick={toggleTheme}
@@ -522,41 +517,17 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
         </motion.div>
       </motion.div>
 
-      {/* Mobile Toggle Button */}
-      <motion.button
-        whileHover={{ scale: 2 }}
-        whileTap={{ scale: 2 }}
+      {/* Mobile Toggle Button (No Animation) */}
+      <button
         onClick={toggleSidebar}
-        className="fixed top-3 left-5 z-30 lg:hidden p-4 rounded-full bg-primary text-text-inverted shadow-lg pulse-soft"
+        className="fixed top-4 left-4 z-30 lg:hidden p-3 rounded-full bg-primary text-text-inverted shadow-lg"
         style={{
           background: "var(--primary)",
           boxShadow: "0 4px 12px rgba(15, 118, 110, 0.3)",
         }}
       >
-        <AnimatePresence mode="wait">
-          {isOpen ? (
-            <motion.div
-              key="close"
-              initial={{ rotate: -90, opacity: 0 }}
-              animate={{ rotate: 0, opacity: 1 }}
-              exit={{ rotate: 90, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <FaTimes className="w-5 h-5" />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="open"
-              initial={{ rotate: 90, opacity: 0 }}
-              animate={{ rotate: 0, opacity: 1 }}
-              exit={{ rotate: -90, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <FaBars className="w-5 h-5" />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.button>
+        {isOpen ? <FaTimes className="w-5 h-5" /> : <FaBars className="w-5 h-5" />}
+      </button>
     </>
   );
 };
