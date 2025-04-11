@@ -1083,7 +1083,7 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null }) => {
                       </button>
                     </div>
                   ) : (
-                    <label className="block w-32 h-32 rounded-lg border-2 border-dashed border-border-primary bg-background hover:bg-background-secondary flex flex-col items-center justify-center cursor-pointer mb-4">
+                    <label className="block w-32 h-32 rounded-lg border-2 border-dashed border-border-primary bg-background hover:bg-background-secondary flex-col items-center justify-center cursor-pointer mb-4">
                       <FaUpload className="w-8 h-8 text-text-muted mb-2" />
                       <span className="text-text-muted text-sm text-center">Upload Image</span>
                       <input

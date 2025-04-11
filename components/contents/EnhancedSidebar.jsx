@@ -524,10 +524,10 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
 
       {/* Mobile Toggle Button */}
       <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{ scale: 2 }}
+        whileTap={{ scale: 2 }}
         onClick={toggleSidebar}
-        className="fixed top-6 left-6 z-30 lg:hidden p-4 rounded-full bg-primary text-text-inverted shadow-lg pulse-soft"
+        className="fixed top-3 left-5 z-30 lg:hidden p-4 rounded-full bg-primary text-text-inverted shadow-lg pulse-soft"
         style={{
           background: "var(--primary)",
           boxShadow: "0 4px 12px rgba(15, 118, 110, 0.3)",

@@ -362,7 +362,7 @@ export const useAllOrders = (initialPage = 1, initialLimit = 10, status = 'all')
       } catch (error) {
         console.error('Error fetching all orders:', error);
         setIsError(true);
-        toast.error('Failed to load orders. Please try again.');
+        //toast.error('Failed to load orders. Please try again.');
       } finally {
         setIsLoading(false);
       }
