@@ -22,17 +22,25 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
   const [reviewsLoaded, setReviewsLoaded] = useState(false);
   const { getProductReviews } = useReviews();
   const [ratingDistribution, setRatingDistribution] = useState([0, 0, 0, 0, 0]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadProductDetails = async () => {
-      const cachedProduct = productCache[initialProduct._id];
-      if (cachedProduct) {
-        setProduct(cachedProduct);
-      } else {
-        const fullProduct = await fetchProductDetails(initialProduct._id);
-        if (fullProduct) {
-          setProduct(fullProduct);
+      try {
+        setLoading(true);
+        const cachedProduct = productCache[initialProduct._id];
+        if (cachedProduct) {
+          setProduct(cachedProduct);
+        } else {
+          const fullProduct = await fetchProductDetails(initialProduct._id);
+          if (fullProduct) {
+            setProduct(fullProduct);
+          }
         }
+      } catch (error) {
+        console.error("Failed to load product details:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -163,8 +171,8 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
   };
 
   const isInCart = cartItems.some((item) => item.productId === product._id);
-  const primaryImageIndex = product.images.findIndex((img) => img.isPrimary) || 0;
-  const images = product.images.length > 0 ? product.images : [{ url: "/images/placeholder.jpg" }];
+  const images = product.images?.length > 0 ? product.images : [{ url: "/images/placeholder.jpg" }];
+  const primaryImageIndex = images.findIndex((img) => img.isPrimary) || 0;
   const currentImage = images[currentImageIndex];
 
   const handleNextImage = () => {
@@ -202,6 +210,14 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
   const getPercentage = (count) => {
     return totalReviews > 0 ? Math.round((count / totalReviews) * 100) : 0;
   };
+  
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <AnimatePresence>

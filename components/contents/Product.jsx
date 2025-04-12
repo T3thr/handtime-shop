@@ -263,10 +263,15 @@ export default function Product() {
   };
 
   const handleProductClick = (product) => {
-    // Add review data to product before opening modal
-    const reviewData = productReviews[product._id] || { averageRating: 0, reviewCount: 0, reviews: [] };
+    const reviewData = productReviews[product._id] || { 
+      averageRating: 0, 
+      reviewCount: 0, 
+      reviews: [] 
+    };
+    
     setSelectedProduct({
       ...product,
+      images: product.images || [], // Ensure images exists
       averageRating: reviewData.averageRating,
       reviewCount: reviewData.reviewCount,
       reviews: reviewData.reviews
