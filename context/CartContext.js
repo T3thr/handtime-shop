@@ -15,31 +15,6 @@ export function CartProvider({ children }) {
 
   const isAuthenticated = status === "authenticated" || !!user || !!lineProfile;
 
-  const fetchProductDetails = useCallback(async (productId) => {
-    if (!productId) return null;
-    if (productCache[productId]) return productCache[productId];
-
-    try {
-      const response = await fetch(`/api/products/${productId}`);
-      if (!response.ok) throw new Error(`Failed to fetch product ${productId}`);
-      const product = await response.json();
-      const enrichedProduct = {
-        id: product._id,
-        productId: product._id,
-        name: product.title || product.name || "Unknown Product",
-        price: Number(product.price) || 0,
-        image: product.images?.[0]?.url || product.image || "/images/placeholder.jpg",
-        quantity: Number(product.quantity) || 0,
-        variant: product.variants?.[0] || product.variant || {},
-      };
-      setProductCache((prev) => ({ ...prev, [productId]: enrichedProduct }));
-      return enrichedProduct;
-    } catch (error) {
-      console.error(`Error fetching product ${productId}:`, error);
-      return null;
-    }
-  }, [productCache]);
-
   const fetchCart = useCallback(async () => {
     if (!isAuthenticated) {
       setCartItems([]);
@@ -49,34 +24,33 @@ export function CartProvider({ children }) {
     setLoading(true);
     try {
       const response = await fetch("/api/cart");
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to fetch cart");
-      }
+      if (!response.ok) throw new Error("Failed to fetch cart");
       const { cart } = await response.json();
-      // Enrich cart items with product details if needed
-      const enrichedCart = await Promise.all(
-        (cart || []).map(async (item) => {
-          const product = await fetchProductDetails(item.productId);
-          return {
-            productId: item.productId,
-            name: item.name || product?.name || "Unknown Product",
-            price: Number(item.price) || product?.price || 0,
-            quantity: Number(item.quantity) || 1,
-            image: item.image || product?.image || "/images/placeholder.jpg",
-            variant: item.variant || product?.variant || {},
-          };
-        })
-      );
-      setCartItems(enrichedCart);
+      setCartItems(cart || []);
     } catch (error) {
       console.error("Error fetching cart:", error);
-      toast.error(`Failed to load cart: ${error.message}`);
-      setCartItems([]);
+      // toast.error("Failed to load your cart");
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, fetchProductDetails]);
+  }, [isAuthenticated]);
+
+  const fetchProductDetails = useCallback(async (productId) => {
+    if (productCache[productId]) {
+      return productCache[productId];
+    }
+
+    try {
+      const response = await fetch(`/api/products/${productId}`);
+      if (!response.ok) throw new Error("Failed to fetch product details");
+      const product = await response.json();
+      setProductCache((prev) => ({ ...prev, [productId]: product }));
+      return product;
+    } catch (error) {
+      console.error("Error fetching product details:", error);
+      return null;
+    }
+  }, [productCache]);
 
   const fetchProductStock = useCallback(async (productId) => {
     const product = await fetchProductDetails(productId);
@@ -91,7 +65,7 @@ export function CartProvider({ children }) {
 
     setLoading(true);
     try {
-      const productId = product.id || product.productId;
+      const productId = product.id;
       const existingItem = cartItems.find((item) => item.productId === productId);
       const currentStock = await fetchProductStock(productId);
 
@@ -129,22 +103,19 @@ export function CartProvider({ children }) {
         });
       }
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to add to cart");
-      }
+      if (!response.ok) throw new Error("Failed to add to cart");
 
-      await fetchCart(); // Refresh cart after modification
-      toast.success(`${product.name} added to cart`);
-      return true;
+      const { cart } = await response.json();
+      setCartItems(cart || []);
+      return cart;
     } catch (error) {
-      console.error("Add to cart error:", error);
-      toast.error(error.message || "Failed to add to cart");
+      console.error("Cart operation error:", error);
+      toast.error(error.message || "Failed to modify cart");
       return false;
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, cartItems, fetchProductStock, fetchCart]);
+  }, [isAuthenticated, cartItems, fetchProductStock]);
 
   const removeFromCart = useCallback(async (productId) => {
     if (!isAuthenticated) {
@@ -154,26 +125,26 @@ export function CartProvider({ children }) {
 
     setLoading(true);
     try {
+      const itemToRemove = cartItems.find((item) => item.productId === productId);
+      if (!itemToRemove) return;
+
       const response = await fetch("/api/cart", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productId }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to remove from cart");
-      }
+      if (!response.ok) throw new Error("Failed to remove from cart");
 
-      await fetchCart();
-      toast.success("Item removed from cart");
+      const { cart } = await response.json();
+      setCartItems(cart || []);
     } catch (error) {
-      console.error("Remove from cart error:", error);
-      toast.error(error.message || "Failed to remove item");
+      console.error("Error removing from cart:", error);
+      toast.error("Failed to remove item");
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, fetchCart]);
+  }, [isAuthenticated, cartItems]);
 
   const updateQuantity = useCallback(async (productId, newQuantity) => {
     if (!isAuthenticated) {
@@ -184,10 +155,8 @@ export function CartProvider({ children }) {
     setLoading(true);
     try {
       const currentStock = await fetchProductStock(productId);
-      const item = cartItems.find((i) => i.productId === productId);
-
       if (newQuantity > currentStock) {
-        toast.error(`Cannot set ${item?.name || "item"} quantity to ${newQuantity}. Only ${currentStock} left in stock.`);
+        toast.error(`Cannot set ${cartItems.find((item) => item.productId === productId)?.name} quantity to ${newQuantity}. Only ${currentStock} left in stock.`);
         return;
       }
 
@@ -202,20 +171,17 @@ export function CartProvider({ children }) {
         body: JSON.stringify({ productId, quantity: newQuantity }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update quantity");
-      }
+      if (!response.ok) throw new Error("Failed to update quantity");
 
-      await fetchCart();
-      toast.success("Quantity updated");
+      const { cart } = await response.json();
+      setCartItems(cart || []);
     } catch (error) {
       console.error("Update quantity error:", error);
-      toast.error(error.message || "Failed to update quantity");
+      toast.error("Failed to update quantity");
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, cartItems, fetchProductStock, removeFromCart, fetchCart]);
+  }, [isAuthenticated, removeFromCart, fetchProductStock, cartItems]);
 
   const clearCart = useCallback(async () => {
     if (!isAuthenticated) {
@@ -230,16 +196,13 @@ export function CartProvider({ children }) {
         headers: { "Content-Type": "application/json" },
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to clear cart");
-      }
+      if (!response.ok) throw new Error("Failed to clear cart");
 
       setCartItems([]);
       toast.success("Cart cleared");
     } catch (error) {
       console.error("Clear cart error:", error);
-      toast.error(error.message || "Failed to clear cart");
+      toast.error("Failed to clear cart");
     } finally {
       setLoading(false);
     }
@@ -248,9 +211,9 @@ export function CartProvider({ children }) {
   const getCartSummary = useCallback(() => {
     const summary = cartItems.reduce(
       (acc, item) => {
-        const itemTotal = (Number(item.price) || 0) * (Number(item.quantity) || 0);
+        const itemTotal = item.price * item.quantity;
         return {
-          totalItems: acc.totalItems + (Number(item.quantity) || 0),
+          totalItems: acc.totalItems + item.quantity,
           subtotal: acc.subtotal + itemTotal,
           itemCount: acc.itemCount + 1,
         };

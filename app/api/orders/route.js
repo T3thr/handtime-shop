@@ -29,28 +29,9 @@ export async function POST(request) {
 
     const { cartItems, totalAmount, message, userName } = body;
 
-    if (
-      !cartItems ||
-      !Array.isArray(cartItems) ||
-      cartItems.length === 0 ||
-      totalAmount == null ||
-      !userName
-    ) {
+    if (!cartItems || cartItems.length === 0 || !totalAmount || !userName) {
       console.log("Invalid order data received:", body);
       return NextResponse.json({ error: "Invalid order data: Missing required fields" }, { status: 400 });
-    }
-
-    // Validate cartItems structure
-    for (const item of cartItems) {
-      if (
-        !item.productId ||
-        !item.name ||
-        item.price == null ||
-        item.quantity == null
-      ) {
-        console.log("Invalid cart item:", item);
-        return NextResponse.json({ error: "Invalid cart item data" }, { status: 400 });
-      }
     }
 
     const userQuery = { $or: [{ email: session.user.email }, { lineId: session.user.lineId }] };
@@ -82,16 +63,16 @@ export async function POST(request) {
     // Create new order with userName
     const order = new Order({
       userId: user._id,
-      userName,
+      userName, // Add userName to the order
       items: cartItems.map((item) => ({
         productId: item.productId,
         name: item.name,
-        price: Number(item.price),
-        quantity: Number(item.quantity),
+        price: item.price,
+        quantity: item.quantity,
         image: item.image || "/images/placeholder.jpg",
         variant: item.variant || {},
       })),
-      totalAmount: Number(totalAmount),
+      totalAmount,
       paymentMethod: "line",
       message,
     });
@@ -103,7 +84,7 @@ export async function POST(request) {
       { _id: user._id },
       {
         $set: { cart: [] },
-        $inc: { "stats.totalOrders": 1, "stats.totalSpent": Number(totalAmount) },
+        $inc: { "stats.totalOrders": 1, "stats.totalSpent": totalAmount },
         "stats.lastOrderDate": new Date(),
       }
     );
@@ -151,9 +132,6 @@ export async function GET(req) {
     }, { status: 200 });
   } catch (error) {
     console.error("Error fetching orders:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch orders", details: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to fetch orders", details: error.message }, { status: 500 });
   }
 }
