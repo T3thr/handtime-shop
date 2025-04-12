@@ -1,12 +1,13 @@
+'use client'; // Ensure this is a client component
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { FaStar, FaRegStar, FaUpload, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { submitReview } from '@/hooks/reviewHooks';
 import Image from 'next/image';
-import { v2 as cloudinary } from 'cloudinary';
 
-export const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
+const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
   const [rating, setRating] = useState(0);
   const [title, setTitle] = useState('');
   const [comment, setComment] = useState('');
@@ -71,17 +72,23 @@ export const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
     const publicId = imagePublicIds[index];
     if (publicId) {
       try {
-        await fetch('/api/upload/delete', {
-          method: 'POST',
+        const response = await fetch('/api/upload', {
+          method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ publicId }),
         });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to delete image');
+        }
       } catch (error) {
         console.error('Error deleting image:', error);
+        toast.error('Failed to delete image');
       }
     }
-    setImages(images.filter((_, i) => i !== index));
-    setImagePublicIds(imagePublicIds.filter((_, i) => i !== index));
+    setImages((prev) => prev.filter((_, i) => i !== index));
+    setImagePublicIds((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e) => {
@@ -231,18 +238,18 @@ export const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
                 </div>
               ))}
               {images.length < 3 && (
-                <label className="w-20 h-20 border-2 border-dashed border-border-primary rounded-md flex items-center justify-center cursor-pointer hover:bg-background-secondary transition-colors relative">
+                <label className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-md flex items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors relative">
                   {uploadingImages.size > 0 ? (
-                    <span className="text-xs text-text-muted">Uploading...</span>
+                    <span className="text-xs text-gray-500">Uploading...</span>
                   ) : (
                     <>
-                      <FaUpload className="text-text-muted" />
+                      <FaUpload className="text-gray-500" />
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
                         onChange={handleImageUpload}
                         className="hidden"
-                        multiple={images.length < 2}
+                        multiple
                         disabled={isSubmitting || uploadingImages.size > 0}
                       />
                     </>
