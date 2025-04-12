@@ -18,7 +18,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { toast } from "react-toastify";
-import ReviewModal from "./ReviewModal";
+import ReviewModal from "./ReviewModal.jsx"; // Explicit .jsx extension
 
 // Order Info Modal Component
 const OrderInfoModal = ({ isOpen, onClose, order }) => {
@@ -174,7 +174,14 @@ const OrderInfoModal = ({ isOpen, onClose, order }) => {
                         // Delay to allow modal to close before opening review modal
                         setTimeout(() => {
                           document.dispatchEvent(new CustomEvent('openReviewModal', { 
-                            detail: { product: item, orderId: order._id } 
+                            detail: { 
+                              product: { 
+                                _id: item.productId, // Normalize to _id
+                                name: item.name,
+                                images: item.image ? [{ url: item.image }] : [],
+                              }, 
+                              orderId: order._id 
+                            } 
                           }));
                         }, 300);
                       }}
@@ -505,7 +512,13 @@ export const OrdersSection = ({ session }) => {
   }, [orders, sortConfig]);
 
   const handleReviewClick = (product, orderId) => {
-    setSelectedProduct(product);
+    // Normalize product to ensure _id
+    const normalizedProduct = {
+      _id: product.productId,
+      name: product.name,
+      images: product.image ? [{ url: product.image }] : [],
+    };
+    setSelectedProduct(normalizedProduct);
     setSelectedOrderId(orderId);
     setReviewModalOpen(true);
   };
@@ -753,7 +766,6 @@ export const WishlistSection = ({ session, onRemoveFromWishlist, onAddToCart }) 
         id: product._id,
         name: product.name,
         price: product.price,
-        description: product.description,
         image: product.images[0]?.url || "/images/placeholder.jpg",
         category: product.categories[0] || "",
       };
