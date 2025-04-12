@@ -754,6 +754,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                     </div>
+                    {/*
                     <div>
                       <label className="block text-text-secondary mb-1">SEO Description</label>
                       <textarea
@@ -765,6 +766,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                     </div>
+                    */}
                   </div>
                 </div>
               </div>

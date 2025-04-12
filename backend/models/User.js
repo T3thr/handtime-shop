@@ -30,11 +30,12 @@ const CartItemSchema = new Schema(
       type: String,
       required: true,
       validate: {
-        validator: function (v) {
-          return /^(https?:\/\/).+\.(jpg|jpeg|png|webp|gif)$/i.test(v);
+        validator: function(v) {
+          // Allow both http(s) URLs and local paths
+          return /^(https?:\/\/).+\.(jpg|jpeg|png|webp|gif)$|^(\/|\.\/|\.\.\/|[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.(jpg|jpeg|png|webp|gif)$/i.test(v);
         },
-        message: (props) => `${props.value} is not a valid image URL!`,
-      },
+        message: props => `${props.value} is not a valid image URL or path!`
+      }
     },
     addedAt: {
       type: Date,

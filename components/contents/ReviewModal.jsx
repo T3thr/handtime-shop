@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import PropTypes from 'prop-types';
 import { motion } from 'framer-motion';
 import { FaStar, FaRegStar, FaUpload, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
@@ -20,7 +19,6 @@ const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
   // Validate props
   if (!isOpen) return null;
   if (!product?._id || !orderId) {
-    console.error('Invalid props:', { product, orderId });
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <motion.div
@@ -140,7 +138,24 @@ const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
       images,
     };
 
+    // Debug log
     console.log('Submitting review data:', reviewData);
+
+    // Client-side validation
+    if (!reviewData.productId) {
+      toast.error('Product ID is missing');
+      return;
+    }
+    if (!reviewData.orderId) {
+      toast.error('Order ID is missing');
+      return;
+    }
+    if (!reviewData.rating) {
+      toast.error('Rating is missing');
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
       await submitReview(reviewData);
@@ -309,21 +324,6 @@ const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
       </motion.div>
     </div>
   );
-};
-
-ReviewModal.propTypes = {
-  isOpen: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
-  product: PropTypes.shape({
-    _id: PropTypes.string.isRequired,
-    name: PropTypes.string,
-    images: PropTypes.arrayOf(
-      PropTypes.shape({
-        url: PropTypes.string,
-      })
-    ),
-  }).isRequired,
-  orderId: PropTypes.string.isRequired,
 };
 
 export default ReviewModal;
