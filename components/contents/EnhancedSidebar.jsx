@@ -20,7 +20,6 @@ import {
   FaMoon,
   FaSun,
   FaStar,
-  FaGlobe,
 } from "react-icons/fa";
 import { MdAdminPanelSettings } from "react-icons/md";
 import { useRouter } from "next/navigation";
@@ -37,11 +36,9 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
   const { theme, toggleTheme } = useTheme();
   const { isOpen, toggleSidebar, isCollapsed, toggleCollapse } = useSidebar();
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
-  const [isGeneralMenuOpen, setIsGeneralMenuOpen] = useState(false);
   const [showUserId, setShowUserId] = useState(false);
   const { user, lineProfile } = useContext(AuthContext);
   const adminMenuRef = useRef(null);
-  const generalMenuRef = useRef(null);
 
   const handleReturn = () => {
     router.push("/");
@@ -63,21 +60,6 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
     { id: "users", label: "Users", icon: FaUsers },
     { id: "allOrders", label: "All Orders", icon: FaClipboardList },
     { id: "allReviews", label: "All Reviews", icon: FaStar },
-  ];
-
-  const generalNavItems = [
-    { 
-      id: "theme", 
-      label: theme === "dark" ? "Light Mode" : "Dark Mode", 
-      icon: theme === "dark" ? FaSun : FaMoon,
-      action: toggleTheme 
-    },
-    { 
-      id: "home", 
-      label: "Return to Home", 
-      icon: FaHome,
-      action: handleReturn 
-    },
   ];
 
   const sidebarVariants = {
@@ -106,25 +88,21 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
     },
   };
 
-  // Handle clicks outside of dropdown menus
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (adminMenuRef.current && !adminMenuRef.current.contains(event.target)) {
         setIsAdminMenuOpen(false);
       }
-      if (generalMenuRef.current && !generalMenuRef.current.contains(event.target)) {
-        setIsGeneralMenuOpen(false);
-      }
     };
 
-    if (isAdminMenuOpen || isGeneralMenuOpen) {
+    if (isAdminMenuOpen) {
       document.addEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isAdminMenuOpen, isGeneralMenuOpen]);
+  }, [isAdminMenuOpen]);
 
   const getUserAvatar = () => {
     if (user?.role === "admin") {
@@ -158,7 +136,7 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
     return (
       <span
         className={`text-xs px-2 py-1 rounded-full ${
-          role === "admin" ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+          role === "admin" ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"
         }`}
       >
         {role}
@@ -206,97 +184,6 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
       );
     }
     return "Guest";
-  };
-
-  // Render collapsible section for regular navigation items
-  const renderNavSection = (items, section, onClick = null) => {
-    return items.map((item) => (
-      <motion.li
-        key={item.id}
-        variants={{
-          hidden: { y: 20, opacity: 0 },
-          visible: { y: 0, opacity: 1 },
-        }}
-      >
-        <motion.div className="relative">
-          <motion.button
-            whileHover="hover"
-            variants={navItemVariants}
-            onClick={() => {
-              if (item.action) {
-                item.action();
-              } else {
-                setActiveSection(item.id);
-                if (window.innerWidth < 1024) toggleSidebar();
-              }
-              if (onClick) onClick();
-            }}
-            className={`w-full flex items-center ${
-              isCollapsed ? "justify-center" : ""
-            } px-4 py-3 rounded-lg transition-all duration-200 ${
-              activeSection === item.id
-                ? "bg-primary text-text-inverted"
-                : "text-text-primary hover:bg-background-secondary hover:text-primary"
-            }`}
-          >
-            <item.icon className={`${isCollapsed ? "w-5 h-5" : "w-5 h-5 mr-3"}`} />
-            {!isCollapsed && <span>{item.label}</span>}
-          </motion.button>
-
-          {!isCollapsed && activeSection === item.id && (
-            <motion.div
-              className="absolute left-0 top-1/2 h-6 w-1 bg-primary-light rounded-r-full transform -translate-y-1/2"
-              initial="inactive"
-              animate="active"
-              variants={activeIndicatorVariants}
-            />
-          )}
-        </motion.div>
-      </motion.li>
-    ));
-  };
-
-  // Render dropdown menu for collapsed mode
-  const renderDropdownMenu = (items, isOpen, onItemClick, ref, position = "-mt-24") => {
-    return (
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            ref={ref}
-            initial={{ opacity: 0, scale: 0.95, y: -5 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -5 }}
-            className={`absolute left-20 ${position} z-50 bg-surface-card rounded-lg shadow-lg border border-border-primary py-2 min-w-[180px]`}
-            style={{
-              background: "var(--surface-card)",
-            }}
-          >
-            {items.map((item) => (
-              <motion.button
-                key={item.id}
-                whileHover={{ x: 5, backgroundColor: "var(--interactive-muted)" }}
-                onClick={() => {
-                  if (item.action) {
-                    item.action();
-                  } else {
-                    setActiveSection(item.id);
-                  }
-                  onItemClick();
-                }}
-                className={`w-full flex items-center px-4 py-2 ${
-                  activeSection === item.id
-                    ? "text-primary font-medium"
-                    : "text-text-primary hover:text-primary"
-                }`}
-              >
-                <item.icon className="w-4 h-4 mr-3" />
-                <span>{item.label}</span>
-              </motion.button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    );
   };
 
   return (
@@ -421,24 +308,46 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                 },
               }}
             >
-              {/* User Navigation Items */}
-              <motion.li
-                variants={{
-                  hidden: { opacity: 0 },
-                  visible: { opacity: 1 },
-                }}
-                className="pb-2"
-              >
-                {isCollapsed ? null : (
-                  <div className="px-4 py-2 text-xs font-medium text-text-muted uppercase tracking-wider">
-                    Account
-                  </div>
-                )}
-              </motion.li>
+              {userNavItems.map((item) => (
+                <motion.li
+                  key={item.id}
+                  variants={{
+                    hidden: { y: 20, opacity: 0 },
+                    visible: { y: 0, opacity: 1 },
+                  }}
+                >
+                  <motion.div className="relative">
+                    <motion.button
+                      whileHover="hover"
+                      variants={navItemVariants}
+                      onClick={() => {
+                        setActiveSection(item.id);
+                        if (window.innerWidth < 1024) toggleSidebar();
+                      }}
+                      className={`w-full flex items-center ${
+                        isCollapsed ? "justify-center" : ""
+                      } px-4 py-3 rounded-lg transition-all duration-200 ${
+                        activeSection === item.id
+                          ? "bg-primary text-text-inverted"
+                          : "text-text-primary hover:bg-background-secondary hover:text-primary"
+                      }`}
+                    >
+                      <item.icon className={`${isCollapsed ? "w-5 h-5" : "w-5 h-5 mr-3"}`} />
+                      {!isCollapsed && <span>{item.label}</span>}
+                    </motion.button>
 
-              {renderNavSection(userNavItems)}
+                    {!isCollapsed && activeSection === item.id && (
+                      <motion.div
+                        className="absolute left-0 top-1/2 h-6 w-1 bg-primary-light rounded-r-full transform -translate-y-1/2"
+                        initial="inactive"
+                        animate="active"
+                        variants={activeIndicatorVariants}
+                      />
+                    )}
+                  </motion.div>
+                </motion.li>
+              ))}
 
-              {/* Admin Section */}
               {isAdmin && (
                 <>
                   <motion.li
@@ -449,7 +358,7 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                     }}
                   >
                     {isCollapsed ? (
-                      <div className="flex justify-center my-4">
+                      <div className="flex justify-center">
                         <div className="w-8 h-0.5 bg-border-primary"></div>
                       </div>
                     ) : (
@@ -472,68 +381,128 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                         onClick={() => setIsAdminMenuOpen(!isAdminMenuOpen)}
                         className="w-full flex justify-center px-4 py-3 rounded-lg text-text-primary hover:bg-background-secondary hover:text-primary transition-all duration-200"
                       >
-                        <MdAdminPanelSettings className="w-6 h-6" />
+                        <MdAdminPanelSettings className="w-7 h-7" />
                       </motion.button>
 
-                      {renderDropdownMenu(
-                        adminNavItems,
-                        isAdminMenuOpen,
-                        () => setIsAdminMenuOpen(false),
-                        adminMenuRef
-                      )}
+                      <AnimatePresence>
+                        {isAdminMenuOpen && (
+                          <motion.div
+                            ref={adminMenuRef}
+                            initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                            className="absolute left-20 -mt-24 z-50 bg-surface-card rounded-lg shadow-lg border border-border-primary py-2 min-w-[180px]"
+                            style={{
+                              background: "var(--surface-card)",
+                            }}
+                          >
+                            {adminNavItems.map((item) => (
+                              <motion.button
+                                key={item.id}
+                                whileHover={{ x: 5, backgroundColor: "var(--interactive-muted)" }}
+                                onClick={() => {
+                                  setActiveSection(item.id);
+                                  setIsAdminMenuOpen(false);
+                                  if (window.innerWidth < 1024) toggleSidebar();
+                                }}
+                                className={`w-full flex items-center px-4 py-2 ${
+                                  activeSection === item.id
+                                    ? "text-primary font-medium"
+                                    : "text-text-primary hover:text-primary"
+                                }`}
+                              >
+                                <item.icon className="w-4 h-4 mr-3" />
+                                <span>{item.label}</span>
+                              </motion.button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </motion.li>
                   ) : (
-                    renderNavSection(adminNavItems)
+                    adminNavItems.map((item) => (
+                      <motion.li
+                        key={item.id}
+                        variants={{
+                          hidden: { y: 20, opacity: 0 },
+                          visible: { y: 0, opacity: 1 },
+                        }}
+                      >
+                        <motion.div className="relative">
+                          <motion.button
+                            whileHover="hover"
+                            variants={navItemVariants}
+                            onClick={() => {
+                              setActiveSection(item.id);
+                              if (window.innerWidth < 1024) toggleSidebar();
+                            }}
+                            className={`w-full flex items-center px-4 py-3 rounded-lg transition-all duration-200 ${
+                              activeSection === item.id
+                                ? "bg-primary text-text-inverted"
+                                : "text-text-primary hover:bg-background-secondary hover:text-primary"
+                            }`}
+                          >
+                            <item.icon className="w-5 h-5 mr-3" />
+                            <span>{item.label}</span>
+                          </motion.button>
+
+                          {activeSection === item.id && (
+                            <motion.div
+                              className="absolute left-0 top-1/2 h-6 w-1 bg-primary-light rounded-r-full transform -translate-y-1/2"
+                              initial="inactive"
+                              animate="active"
+                              variants={activeIndicatorVariants}
+                            />
+                          )}
+                        </motion.div>
+                      </motion.li>
+                    ))
                   )}
                 </>
               )}
 
-              {/* General Section */}
               <motion.li
-                className="pt-4"
                 variants={{
-                  hidden: { opacity: 0 },
-                  visible: { opacity: 1 },
+                  hidden: { y: 20, opacity: 0 },
+                  visible: { y: 0, opacity: 1 },
                 }}
+                className="mt-4"
               >
-                {isCollapsed ? (
-                  <div className="flex justify-center my-4">
-                    <div className="w-8 h-0.5 bg-border-primary"></div>
-                  </div>
-                ) : (
-                  <div className="px-4 py-2 text-xs font-medium text-text-muted uppercase tracking-wider">
-                    General
-                  </div>
-                )}
+                <motion.button
+                  whileHover="hover"
+                  variants={navItemVariants}
+                  onClick={handleReturn}
+                  className={`w-full flex items-center ${
+                    isCollapsed ? "justify-center" : ""
+                  } px-4 py-3 rounded-lg text-text-primary hover:bg-background-secondary hover:text-primary transition-all duration-200`}
+                >
+                  <FaHome className={`${isCollapsed ? "w-5 h-5" : "w-5 h-5 mr-3"}`} />
+                  {!isCollapsed && <span>Return to Home</span>}
+                </motion.button>
               </motion.li>
 
-              {isCollapsed ? (
-                <motion.li
-                  variants={{
-                    hidden: { y: 20, opacity: 0 },
-                    visible: { y: 0, opacity: 1 },
-                  }}
+              <motion.li
+                variants={{
+                  hidden: { y: 20, opacity: 0 },
+                  visible: { y: 0, opacity: 1 },
+                }}
+              >
+                <motion.button
+                  whileHover="hover"
+                  variants={navItemVariants}
+                  onClick={toggleTheme}
+                  className={`w-full flex items-center ${
+                    isCollapsed ? "justify-center" : ""
+                  } px-4 py-3 rounded-lg text-text-primary hover:bg-background-secondary hover:text-primary transition-all duration-200`}
                 >
-                  <motion.button
-                    whileHover="hover"
-                    variants={navItemVariants}
-                    onClick={() => setIsGeneralMenuOpen(!isGeneralMenuOpen)}
-                    className="w-full flex justify-center px-4 py-3 rounded-lg text-text-primary hover:bg-background-secondary hover:text-primary transition-all duration-200"
-                  >
-                    <FaGlobe className="w-5 h-5" />
-                  </motion.button>
-
-                  {renderDropdownMenu(
-                    generalNavItems,
-                    isGeneralMenuOpen,
-                    () => setIsGeneralMenuOpen(false),
-                    generalMenuRef,
-                    "-mt-16"
+                  {theme === "dark" ? (
+                    <FaSun className={`${isCollapsed ? "w-5 h-5" : "w-5 h-5 mr-3"}`} />
+                  ) : (
+                    <FaMoon className={`${isCollapsed ? "w-5 h-5" : "w-5 h-5 mr-3"}`} />
                   )}
-                </motion.li>
-              ) : (
-                renderNavSection(generalNavItems)
-              )}
+                  {!isCollapsed && <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>}
+                </motion.button>
+              </motion.li>
             </motion.ul>
           </nav>
         </div>
