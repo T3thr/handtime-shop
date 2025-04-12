@@ -18,7 +18,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { toast } from "react-toastify";
-import ReviewModal from "./ReviewModal";
+import ReviewModal from "@/components/contents/ReviewModal";
 
 // Order Info Modal Component
 const OrderInfoModal = ({ isOpen, onClose, order }) => {
