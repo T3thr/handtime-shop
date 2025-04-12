@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
@@ -177,12 +177,38 @@ export const useAllReviews = (page = 1, limit = 10, status = 'all') => {
 };
 
 export const submitReview = async (reviewData) => {
+  // Client-side validation
+  if (!reviewData?.productId) {
+    throw new Error('Product ID is missing');
+  }
+  if (!reviewData?.orderId) {
+    throw new Error('Order ID is missing');
+  }
+  if (!reviewData?.rating || reviewData.rating < 1 || reviewData.rating > 5) {
+    throw new Error('Rating must be between 1 and 5');
+  }
+
+  console.log('Sending review to API:', reviewData);
+
   try {
     const response = await axios.post('/api/review', reviewData);
-    return response.data;
+    return response.data.review;
   } catch (error) {
     console.error('Error submitting review:', error);
-    const message = error.response?.data?.message || error.message || 'Failed to submit review';
+    const status = error.response?.status;
+    const serverError = error.response?.data?.error;
+    let message = 'Failed to submit review';
+
+    if (status === 400) {
+      message = serverError || 'Invalid review data';
+    } else if (status === 401) {
+      message = 'Please log in to submit a review';
+    } else if (status === 404) {
+      message = serverError || 'Product or order not found';
+    } else if (status === 500) {
+      message = 'Server error, please try again later';
+    }
+
     throw new Error(message);
   }
 };

@@ -1,4 +1,4 @@
-'use client'; // Ensure this is a client component
+'use client';
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
@@ -15,6 +15,31 @@ const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
   const [imagePublicIds, setImagePublicIds] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(new Set());
+
+  // Validate props
+  if (!isOpen) return null;
+  if (!product?._id || !orderId) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+          className="bg-background rounded-lg p-6 w-full max-w-lg"
+        >
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold">Error</h3>
+            <button onClick={onClose} className="text-text-secondary hover:text-text-primary">
+              <FaTimes />
+            </button>
+          </div>
+          <p className="text-red-500">
+            Cannot load review form: Invalid product or order information.
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
 
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -94,8 +119,8 @@ const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (rating === 0) {
-      toast.error('Please select a rating');
+    if (!rating || rating < 1 || rating > 5) {
+      toast.error('Please select a rating between 1 and 5');
       return;
     }
 
@@ -104,18 +129,36 @@ const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
       return;
     }
 
+    const reviewData = {
+      productId: product._id,
+      orderId,
+      rating,
+      title: title.trim(),
+      comment: comment.trim(),
+      images,
+    };
+
+    // Debug log
+    console.log('Submitting review data:', reviewData);
+
+    // Client-side validation
+    if (!reviewData.productId) {
+      toast.error('Product ID is missing');
+      return;
+    }
+    if (!reviewData.orderId) {
+      toast.error('Order ID is missing');
+      return;
+    }
+    if (!reviewData.rating) {
+      toast.error('Rating is missing');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      await submitReview({
-        productId: product._id,
-        orderId,
-        rating,
-        title: title.trim(),
-        comment: comment.trim(),
-        images,
-      });
-
+      await submitReview(reviewData);
       toast.success('Review submitted successfully!');
       onClose();
       setRating(0);
@@ -130,8 +173,6 @@ const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
       setIsSubmitting(false);
     }
   };
-
-  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -156,7 +197,7 @@ const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
           <div className="w-16 h-16 relative rounded-md overflow-hidden mr-4">
             <Image
               src={product.images?.[0]?.url || '/images/placeholder.jpg'}
-              alt={product.name}
+              alt={product.name || 'Product'}
               fill
               className="object-cover"
               sizes="(max-width: 768px) 64px, 64px"
@@ -164,7 +205,7 @@ const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
             />
           </div>
           <div>
-            <h4 className="font-medium text-text-primary">{product.name}</h4>
+            <h4 className="font-medium text-text-primary">{product.name || 'Unknown Product'}</h4>
             <p className="text-sm text-text-secondary">Order #{orderId.substring(0, 8)}</p>
           </div>
         </div>

@@ -61,10 +61,16 @@ export const UserManagement = () => {
   };
 
   const getSortIcon = (key) => {
-    if (sortConfig.key !== key) {
-      return null;
-    }
-    return sortConfig.direction === 'ascending' ? <FaSortUp className="inline ml-1" /> : <FaSortDown className="inline ml-1" />;
+    return (
+      <span className="inline-flex flex-col ml-1">
+        <FaSortUp 
+          className={`h-3 w-3 ${sortConfig.key === key && sortConfig.direction === 'ascending' ? 'text-primary' : 'text-text-secondary opacity-30'}`} 
+        />
+        <FaSortDown 
+          className={`h-3 w-3 -mt-1 ${sortConfig.key === key && sortConfig.direction === 'descending' ? 'text-primary' : 'text-text-secondary opacity-30'}`} 
+        />
+      </span>
+    );
   };
 
   const sortedUsers = React.useMemo(() => {
@@ -373,10 +379,16 @@ export const OrderManagement = () => {
   };
 
   const getSortIcon = (key) => {
-    if (sortConfig.key !== key) {
-      return null;
-    }
-    return sortConfig.direction === 'ascending' ? <FaSortUp className="inline ml-1 text-secondary" /> : <FaSortDown className="inline ml-1 text-secondary" />;
+    return (
+      <span className="inline-flex flex-col ml-1">
+        <FaSortUp 
+          className={`h-3 w-3 ${sortConfig.key === key && sortConfig.direction === 'ascending' ? 'text-primary' : 'text-text-secondary opacity-30'}`} 
+        />
+        <FaSortDown 
+          className={`h-3 w-3 -mt-1 ${sortConfig.key === key && sortConfig.direction === 'descending' ? 'text-primary' : 'text-text-secondary opacity-30'}`} 
+        />
+      </span>
+    );
   };
 
   const sortedOrders = React.useMemo(() => {
@@ -665,10 +677,16 @@ export const ReviewManagement = () => {
   };
 
   const getSortIcon = (key) => {
-    if (sortConfig.key !== key) {
-      return null;
-    }
-    return sortConfig.direction === 'ascending' ? <FaSortUp className="inline ml-1" /> : <FaSortDown className="inline ml-1" />;
+    return (
+      <span className="inline-flex flex-col ml-1">
+        <FaSortUp 
+          className={`h-3 w-3 ${sortConfig.key === key && sortConfig.direction === 'ascending' ? 'text-primary' : 'text-text-secondary opacity-30'}`} 
+        />
+        <FaSortDown 
+          className={`h-3 w-3 -mt-1 ${sortConfig.key === key && sortConfig.direction === 'descending' ? 'text-primary' : 'text-text-secondary opacity-30'}`} 
+        />
+      </span>
+    );
   };
 
   const sortedReviews = React.useMemo(() => {
@@ -1026,10 +1044,16 @@ export const ManageStore = ({
   };
 
   const getSortIcon = (key) => {
-    if (sortConfig.key !== key) {
-      return null;
-    }
-    return sortConfig.direction === 'ascending' ? <FaSortUp className="inline ml-1" /> : <FaSortDown className="inline ml-1" />;
+    return (
+      <span className="inline-flex flex-col ml-1">
+        <FaSortUp 
+          className={`h-3 w-3 ${sortConfig.key === key && sortConfig.direction === 'ascending' ? 'text-primary' : 'text-text-secondary opacity-30'}`} 
+        />
+        <FaSortDown 
+          className={`h-3 w-3 -mt-1 ${sortConfig.key === key && sortConfig.direction === 'descending' ? 'text-primary' : 'text-text-secondary opacity-30'}`} 
+        />
+      </span>
+    );
   };
 
   const sortedProducts = React.useMemo(() => {

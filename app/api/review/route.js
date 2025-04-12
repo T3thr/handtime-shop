@@ -4,6 +4,7 @@ import dbConnect from '@/backend/lib/mongodb';
 import Review from '@/backend/models/Review';
 import Product from '@/backend/models/Product';
 import User from '@/backend/models/User';
+import Order from '@/backend/models/Order';
 import { getServerSession } from 'next-auth/next';
 import { options } from '@/app/api/auth/[...nextauth]/options';
 
@@ -88,27 +89,50 @@ export async function POST(request) {
 
     const data = await request.json();
 
-    if (!data.productId || !data.orderId || !data.rating) {
+    // Validate required fields individually
+    const missingFields = [];
+    if (!data.productId) missingFields.push('productId');
+    if (!data.orderId) missingFields.push('orderId');
+    if (!data.rating) missingFields.push('rating');
+
+    if (missingFields.length > 0) {
       return NextResponse.json(
-        { error: 'Product ID, Order ID, and rating are required' },
+        { error: `Missing required fields: ${missingFields.join(', ')}` },
         { status: 400 }
       );
     }
 
-    if (!mongoose.Types.ObjectId.isValid(data.productId) || !mongoose.Types.ObjectId.isValid(data.orderId)) {
-      return NextResponse.json({ error: 'Invalid ID format' }, { status: 400 });
+    // Validate IDs
+    if (!mongoose.Types.ObjectId.isValid(data.productId)) {
+      return NextResponse.json({ error: 'Invalid product ID format' }, { status: 400 });
+    }
+    if (!mongoose.Types.ObjectId.isValid(data.orderId)) {
+      return NextResponse.json({ error: 'Invalid order ID format' }, { status: 400 });
     }
 
-    if (data.rating < 1 || data.rating > 5) {
-      return NextResponse.json({ error: 'Rating must be between 1 and 5' }, { status: 400 });
+    // Validate rating
+    if (!Number.isInteger(data.rating) || data.rating < 1 || data.rating > 5) {
+      return NextResponse.json({ error: 'Rating must be an integer between 1 and 5' }, { status: 400 });
     }
 
+    // Check if product exists
+    const product = await Product.findById(data.productId);
+    if (!product) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+    }
+
+    // Check if order exists and belongs to user
+    const order = await Order.findById(data.orderId);
+    if (!order || order.userId.toString() !== session.user.id) {
+      return NextResponse.json({ error: 'Order not found or not authorized' }, { status: 404 });
+    }
+
+    // Check for duplicate review
     const existingReview = await Review.findOne({
       userId: session.user.id,
       productId: data.productId,
       orderId: data.orderId,
     });
-
     if (existingReview) {
       return NextResponse.json(
         { error: 'You have already reviewed this product for this order' },
@@ -116,63 +140,52 @@ export async function POST(request) {
       );
     }
 
-    const sessionMongo = await mongoose.startSession();
-    sessionMongo.startTransaction();
+    // Create review
+    const review = new Review({
+      userId: session.user.id,
+      productId: data.productId,
+      orderId: data.orderId,
+      rating: data.rating,
+      title: data.title?.trim() || '',
+      comment: data.comment?.trim() || '',
+      images: Array.isArray(data.images) ? data.images : [],
+      verifiedPurchase: true,
+      status: 'pending',
+    });
 
-    try {
-      const review = new Review({
-        userId: session.user.id,
-        productId: data.productId,
-        orderId: data.orderId,
-        rating: data.rating,
-        title: data.title?.trim() || '',
-        comment: data.comment?.trim() || '',
-        images: data.images || [],
-        verifiedPurchase: true,
-        status: 'pending',
-      });
+    // Save review
+    await review.save();
 
-      await review.save({ session: sessionMongo });
+    // Update user
+    await User.findByIdAndUpdate(session.user.id, {
+      $push: { reviews: review._id },
+      $inc: { 'stats.totalReviews': 1 },
+      $set: { 'stats.lastReviewDate': new Date() },
+    });
 
-      await User.findByIdAndUpdate(
-        session.user.id,
-        {
-          $push: { reviews: review._id },
-          $inc: { 'stats.totalReviews': 1 },
-          $set: { 'stats.lastReviewDate': new Date() },
-        },
-        { session: sessionMongo }
-      );
+    // Update product stats
+    const productReviews = await Review.find({ productId: data.productId, status: 'approved' });
+    const reviewCount = productReviews.length + (review.status === 'approved' ? 1 : 0);
+    const totalRating =
+      productReviews.reduce((sum, r) => sum + r.rating, 0) + (review.status === 'approved' ? review.rating : 0);
+    const averageRating = reviewCount > 0 ? parseFloat((totalRating / reviewCount).toFixed(1)) : 0;
 
-      const productReviews = await Review.find({ productId: data.productId, status: 'approved' }).session(
-        sessionMongo
-      );
-      const reviewCount = productReviews.length + (review.status === 'approved' ? 1 : 0);
-      const totalRating =
-        productReviews.reduce((sum, r) => sum + r.rating, 0) + (review.status === 'approved' ? review.rating : 0);
-      const averageRating = reviewCount > 0 ? parseFloat((totalRating / reviewCount).toFixed(1)) : 0;
+    await Product.findByIdAndUpdate(data.productId, {
+      averageRating,
+      reviewCount,
+    });
 
-      await Product.findByIdAndUpdate(
-        data.productId,
-        {
-          averageRating,
-          reviewCount,
-        },
-        { session: sessionMongo }
-      );
-
-      await sessionMongo.commitTransaction();
-      return NextResponse.json(review);
-    } catch (error) {
-      await sessionMongo.abortTransaction();
-      throw error;
-    } finally {
-      sessionMongo.endSession();
-    }
+    return NextResponse.json({
+      message: 'Review submitted successfully',
+      review,
+    });
   } catch (error) {
     console.error('Failed to create review:', error);
     return NextResponse.json(
-      { error: 'Failed to create review', details: error.message },
+      {
+        error: 'Failed to create review',
+        details: error.message || 'An unexpected error occurred',
+      },
       { status: error.status || 500 }
     );
   }

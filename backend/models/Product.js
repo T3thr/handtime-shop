@@ -90,7 +90,7 @@ const ProductSchema = new Schema(
   }
 );
 
-ProductSchema.index({ slug: 1 });
+// Keep only necessary indexes
 ProductSchema.index({ categories: 1, price: 1 });
 
 const Product = mongoose.models.Product || mongoose.model('Product', ProductSchema);
