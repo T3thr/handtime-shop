@@ -18,7 +18,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { toast } from "react-toastify";
-import ReviewModal from "./ReviewModal"; // Explicit .jsx extension
+import ReviewModal from "./ReviewModal.jsx"; // Explicit .jsx extension
 
 // Order Info Modal Component
 const OrderInfoModal = ({ isOpen, onClose, order }) => {
@@ -171,12 +171,11 @@ const OrderInfoModal = ({ isOpen, onClose, order }) => {
                     <button 
                       onClick={() => {
                         onClose();
-                        // Delay to allow modal to close before opening review modal
                         setTimeout(() => {
                           document.dispatchEvent(new CustomEvent('openReviewModal', { 
                             detail: { 
                               product: { 
-                                _id: item.productId, // Normalize to _id
+                                _id: item.productId, 
                                 name: item.name,
                                 images: item.image ? [{ url: item.image }] : [],
                               }, 
@@ -947,7 +946,7 @@ export const WishlistSection = ({ session, onRemoveFromWishlist, onAddToCart }) 
 };
 
 export const ReviewsSection = ({ session }) => {
-  const { reviews, isLoading, isError, pagination, changePage } = useReviews();
+  const { reviews, isLoading, isError, pagination, changePage } = useUserReviews(); 
   const router = useRouter();
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
 

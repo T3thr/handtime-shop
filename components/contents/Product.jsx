@@ -485,10 +485,14 @@ export default function Product() {
           initial={{ opacity: 0, scale: 0.8 }}
           animate={heroInView ? { opacity: 0.4, scale: 1 } : { opacity: 0, scale: 0.8 }}
           transition={{ duration: 1.2, delay: 1.4 }}
-          className="absolute bottom-1/4 -left-24 w-64 h-64 rounded-full bg-primary/20 blur-3xl"
+          className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-primary-light/20 blur-3xl"
         ></motion.div>
+
+        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background dark:from-background to-transparent"></div>
       </section>
-      <ImageSlider/>
+
+      <ImageSlider />
+      
       {/* Categories Section */}
       <section
         ref={categoriesRef}

@@ -10,8 +10,8 @@ import Image from "next/image";
 import liff from "@line/liff";
 
 const LineCheckoutModal = ({ isOpen, onClose }) => {
-  const { cartItems, getCartSummary, clearCart } = useCart();
-  const { user, lineProfile } = useContext(AuthContext); // Added user from AuthContext
+  const { cartItems, getCartSummary, clearCart, fetchCart } = useCart();
+  const { user, lineProfile } = useContext(AuthContext);
   const { subtotal, totalItems } = getCartSummary();
   const [isProcessing, setIsProcessing] = useState(false);
   const [showThankYou, setShowThankYou] = useState(false);
@@ -24,9 +24,15 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
   const LINE_OA_URL = `https://line.me/R/ti/p/${LINE_OA_ID.startsWith('@') ? LINE_OA_ID : `@${LINE_OA_ID}`}`;
 
   useEffect(() => {
+    if (isOpen) {
+      fetchCart(); // Refresh cart when modal opens
+    }
+  }, [isOpen, fetchCart]);
+
+  useEffect(() => {
     const initializeLiff = async () => {
       try {
-        if (!LIFF_ID) throw new Error("LIFF ID is not set in environment variables");
+        if (!LIFF_ID) throw new Error("LIFF ID is not set");
         await liff.init({ liffId: LIFF_ID });
         setIsLiffInitialized(true);
         console.log("LIFF initialized successfully");
@@ -40,24 +46,27 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
   }, [isOpen, LIFF_ID, isLiffInitialized]);
 
   const formatOrderMessage = useCallback(() => {
-    // Use user.name if available, otherwise fall back to lineProfile.displayName
     const userName = user?.name || lineProfile?.displayName || "Customer";
     let message = `🛒 New Order from ${userName} 🛒\n`;
     if (orderId) message += `Order ID: ${orderId}\n\n`;
     cartItems.forEach((item, index) => {
-      message += `${index + 1}. ${item.name}\n`;
-      message += `   ${item.quantity} x ฿${item.price.toFixed(2)} = ฿${(item.quantity * item.price).toFixed(2)}\n`;
+      message += `${index + 1}. ${item.name || "Unknown Product"}\n`;
+      if (item.variant && Object.keys(item.variant).length > 0) {
+        message += `   Variant: ${Object.entries(item.variant).map(([k, v]) => `${k}: ${v}`).join(", ")}\n`;
+      }
+      message += `   ${item.quantity} x ฿${(Number(item.price) || 0).toFixed(2)} = ฿${((Number(item.price) || 0) * (Number(item.quantity) || 0)).toFixed(2)}\n`;
     });
     message += "\n------------------------\n";
-    message += `Subtotal: ฿${subtotal.toFixed(2)}\n`;
-    message += `Total Items: ${totalItems}\n`;
+    message += `Subtotal: ฿${(Number(subtotal) || 0).toFixed(2)}\n`;
+    message += `Total Items: ${totalItems || 0}\n`;
     message += "\nPlease reply with your shipping details to complete the order.";
     return message;
   }, [cartItems, subtotal, totalItems, user, lineProfile, orderId]);
 
   const copyOrderToClipboard = useCallback(() => {
     const orderMessage = formatOrderMessage();
-    navigator.clipboard.writeText(orderMessage)
+    navigator.clipboard
+      .writeText(orderMessage)
       .then(() => toast.success("Order copied to clipboard! Paste it in LINE chat"))
       .catch((err) => {
         console.error("Failed to copy text:", err);
@@ -66,10 +75,14 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
   }, [formatOrderMessage]);
 
   const handleLineCheckout = useCallback(async () => {
-    setIsProcessing(true);
+    if (!cartItems.length) {
+      toast.error("Your cart is empty");
+      return;
+    }
 
+    setIsProcessing(true);
     try {
-      if (!LIFF_ID) throw new Error("LIFF ID is not set in environment variables");
+      if (!LIFF_ID) throw new Error("LIFF ID is not set");
       if (!isLiffInitialized) await liff.init({ liffId: LIFF_ID });
 
       if (!liff.isLoggedIn()) {
@@ -80,35 +93,23 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
       }
 
       const orderMessage = formatOrderMessage();
-      const userName = user?.name || lineProfile?.displayName || "Customer"; // Ensure userName is included
+      const userName = user?.name || lineProfile?.displayName || "Customer";
 
-      console.log("Sending order to /api/orders");
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cartItems, totalAmount: subtotal, message: orderMessage, userName }),
       });
 
-      let data;
-      try {
-        data = await response.json();
-      } catch (e) {
-        const text = await response.text();
-        console.error("Raw API response:", text);
-        throw new Error(`Server returned invalid JSON: ${text.slice(0, 100)}...`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || errorData.details || "Failed to process order");
       }
 
-      if (!response.ok) throw new Error(data.error || data.details || "Unknown error from server");
-
-      console.log("API response:", data);
+      const data = await response.json();
       setOrderId(data.orderId);
       clearCart();
       setOrderProcessed(true);
-
-      if (data.warning) {
-        toast.warn(data.warning);
-        console.warn("Warning from API:", data.warning);
-      }
 
       await navigator.clipboard.writeText(orderMessage);
       toast.success("Order message copied to clipboard! Opening LINE...");
@@ -135,7 +136,18 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
     } finally {
       setIsProcessing(false);
     }
-  }, [formatOrderMessage, cartItems, subtotal, clearCart, onClose, LINE_OA_URL, LIFF_ID, isLiffInitialized, user, lineProfile]);
+  }, [
+    cartItems,
+    subtotal,
+    formatOrderMessage,
+    clearCart,
+    onClose,
+    LINE_OA_URL,
+    LIFF_ID,
+    isLiffInitialized,
+    user,
+    lineProfile,
+  ]);
 
   return (
     <AnimatePresence>
@@ -168,49 +180,68 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
                   </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4">
-                  <div className="mb-4">
-                    <p className="text-sm text-text-secondary mb-2">
-                      Your order will be sent to our LINE Official Account ({LINE_OA_ID}).{" "}
-                      {orderProcessed ? "The message has been copied to your clipboard. Please paste it in the LINE chat." : ""}
-                    </p>
-                    <div className="bg-background-secondary p-4 rounded-lg text-sm font-mono whitespace-pre-wrap relative">
-                      {formatOrderMessage()}
-                      {orderProcessed && (
-                        <button
-                          onClick={copyOrderToClipboard}
-                          className="absolute top-2 right-2 p-1 rounded bg-interactive-muted hover:bg-interactive-hover transition-colors"
-                          title="Copy to clipboard"
-                        >
-                          <Copy className="h-4 w-4 text-text-secondary" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-4 mt-6">
-                    <h3 className="font-medium text-text-primary">Order Summary</h3>
-                    {cartItems.map((item) => (
-                      <div key={item.productId} className="flex items-center space-x-3">
-                        <div className="relative h-12 w-12 flex-shrink-0">
-                          <Image src={item.image} alt={item.name} fill className="object-cover rounded-md" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-text-primary">{item.name}</p>
-                          <p className="text-xs text-text-muted">
-                            {item.quantity} x ฿{item.price.toFixed(2)}
-                          </p>
-                        </div>
-                        <p className="text-sm font-medium text-text-primary">
-                          ฿{(item.quantity * item.price).toFixed(2)}
+                  {cartItems.length === 0 ? (
+                    <p className="text-sm text-text-secondary">Your cart is empty.</p>
+                  ) : (
+                    <>
+                      <div className="mb-4">
+                        <p className="text-sm text-text-secondary mb-2">
+                          Your order will be sent to our LINE Official Account ({LINE_OA_ID}).{" "}
+                          {orderProcessed ? "The message has been copied to your clipboard. Please paste it in the LINE chat." : ""}
                         </p>
+                        <div className="bg-background-secondary p-4 rounded-lg text-sm font-mono whitespace-pre-wrap relative">
+                          {formatOrderMessage()}
+                          {orderProcessed && (
+                            <button
+                              onClick={copyOrderToClipboard}
+                              className="absolute top-2 right-2 p-1 rounded bg-interactive-muted hover:bg-interactive-hover transition-colors"
+                              title="Copy to clipboard"
+                            >
+                              <Copy className="h-4 w-4 text-text-secondary" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    ))}
-                    <div className="border-t border-border-primary pt-3 mt-3">
-                      <div className="flex justify-between">
-                        <span className="font-medium text-text-primary">Total</span>
-                        <span className="font-semibold text-text-primary">฿{subtotal.toFixed(2)}</span>
+                      <div className="space-y-4 mt-6">
+                        <h3 className="font-medium text-text-primary">Order Summary</h3>
+                        {cartItems.map((item) => (
+                          <div key={item.productId} className="flex items-center space-x-3">
+                            <div className="relative h-12 w-12 flex-shrink-0">
+                              <Image
+                                src={item.image || "/images/placeholder.jpg"}
+                                alt={item.name || "Product"}
+                                fill
+                                className="object-cover rounded-md"
+                                onError={(e) => {
+                                  e.target.src = "/images/placeholder.jpg";
+                                }}
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-text-primary">{item.name || "Unknown Product"}</p>
+                              {item.variant && Object.keys(item.variant).length > 0 && (
+                                <p className="text-xs text-text-muted">
+                                  Variant: {Object.entries(item.variant).map(([k, v]) => `${k}: ${v}`).join(", ")}
+                                </p>
+                              )}
+                              <p className="text-xs text-text-muted">
+                                {item.quantity || 0} x ฿{(Number(item.price) || 0).toFixed(2)}
+                              </p>
+                            </div>
+                            <p className="text-sm font-medium text-text-primary">
+                              ฿{((Number(item.price) || 0) * (Number(item.quantity) || 0)).toFixed(2)}
+                            </p>
+                          </div>
+                        ))}
+                        <div className="border-t border-border-primary pt-3 mt-3">
+                          <div className="flex justify-between">
+                            <span className="font-medium text-text-primary">Total</span>
+                            <span className="font-semibold text-text-primary">฿{(Number(subtotal) || 0).toFixed(2)}</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    </>
+                  )}
                 </div>
                 <div className="p-4 border-t border-border-primary">
                   {!orderProcessed ? (
@@ -271,7 +302,7 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
                 </div>
                 <h3 className="text-xl font-semibold text-text-primary mb-2">Thank You!</h3>
                 <p className="text-sm text-text-secondary mb-4">
-                  Your order (ID: {orderId}) has been processed. Please paste the copied message to our LINE Official Account ({LINE_OA_ID}).
+                  Your order (ID: {orderId || "N/A"}) has been processed. Please paste the copied message to our LINE Official Account ({LINE_OA_ID}).
                 </p>
                 <button
                   onClick={() => {

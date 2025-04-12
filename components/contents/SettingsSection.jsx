@@ -32,7 +32,7 @@ export const SettingsSection = ({ session }) => {
       setAddresses(response.data.addresses || []);
     } catch (error) {
       console.error("Failed to fetch addresses:", error);
-      toast.error("Failed to load addresses");
+      //toast.error("Failed to load addresses");
     } finally {
       setIsAddressLoading(false);
     }
