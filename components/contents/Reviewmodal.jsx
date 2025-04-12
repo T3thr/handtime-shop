@@ -6,7 +6,7 @@ import { submitReview } from '@/hooks/reviewHooks';
 import Image from 'next/image';
 import { v2 as cloudinary } from 'cloudinary';
 
-const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
+export const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
   const [rating, setRating] = useState(0);
   const [title, setTitle] = useState('');
   const [comment, setComment] = useState('');
