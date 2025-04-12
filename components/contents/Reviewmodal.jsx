@@ -7,7 +7,7 @@ import { toast } from 'react-toastify';
 import { submitReview } from '@/hooks/reviewHooks';
 import Image from 'next/image';
 
-const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
+export const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
   const [rating, setRating] = useState(0);
   const [title, setTitle] = useState('');
   const [comment, setComment] = useState('');
@@ -326,4 +326,3 @@ const ReviewModal = ({ isOpen, onClose, product, orderId }) => {
   );
 };
 
-export default ReviewModal;
