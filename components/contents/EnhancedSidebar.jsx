@@ -19,15 +19,16 @@ import {
   FaHome,
   FaMoon,
   FaSun,
+  FaStar,
 } from "react-icons/fa";
-import { MdAdminPanelSettings } from "react-icons/md";
+import { MdAdminPanelSettings, MdDashboard } from "react-icons/md";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import Image from "next/image";
 import { useTheme } from "@/context/Theme";
 import { useSidebar } from "@/context/DashboardSidebarContext";
 import AuthContext from "@/context/AuthContext";
-import { Shield, Copy, Eye, EyeOff } from "lucide-react";
+import { Shield, Copy, Eye, EyeOff, Settings } from "lucide-react";
 import { toast } from "react-toastify";
 
 export const Sidebar = ({ activeSection, setActiveSection, session }) => {
@@ -35,9 +36,11 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
   const { theme, toggleTheme } = useTheme();
   const { isOpen, toggleSidebar, isCollapsed, toggleCollapse } = useSidebar();
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
+  const [isGeneralMenuOpen, setIsGeneralMenuOpen] = useState(false);
   const [showUserId, setShowUserId] = useState(false);
   const { user, lineProfile } = useContext(AuthContext);
   const adminMenuRef = useRef(null);
+  const generalMenuRef = useRef(null);
 
   const handleReturn = () => {
     router.push("/");
@@ -58,6 +61,22 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
     { id: "store", label: "Store", icon: FaStore },
     { id: "users", label: "Users", icon: FaUsers },
     { id: "allOrders", label: "All Orders", icon: FaClipboardList },
+    { id: "allReviews", label: "All Reviews", icon: FaStar },
+  ];
+
+  const generalNavItems = [
+    { 
+      id: "theme", 
+      label: theme === "dark" ? "Light Mode" : "Dark Mode", 
+      icon: theme === "dark" ? FaSun : FaMoon,
+      action: toggleTheme 
+    },
+    { 
+      id: "home", 
+      label: "Return to Home", 
+      icon: FaHome,
+      action: handleReturn 
+    },
   ];
 
   const sidebarVariants = {
@@ -86,21 +105,25 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
     },
   };
 
+  // Handle clicks outside of floating menus
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (adminMenuRef.current && !adminMenuRef.current.contains(event.target)) {
         setIsAdminMenuOpen(false);
       }
+      if (generalMenuRef.current && !generalMenuRef.current.contains(event.target)) {
+        setIsGeneralMenuOpen(false);
+      }
     };
 
-    if (isAdminMenuOpen) {
+    if (isAdminMenuOpen || isGeneralMenuOpen) {
       document.addEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isAdminMenuOpen]);
+  }, [isAdminMenuOpen, isGeneralMenuOpen]);
 
   const getUserAvatar = () => {
     if (user?.role === "admin") {
@@ -134,7 +157,7 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
     return (
       <span
         className={`text-xs px-2 py-1 rounded-full ${
-          role === "admin" ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"
+          role === "admin" ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
         }`}
       >
         {role}
@@ -152,7 +175,7 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
           <div className="flex items-center space-x-1">
             <button
               onClick={() => setShowUserId(!showUserId)}
-              className="p-1 rounded hover:bg-container"
+              className="p-1 rounded hover:bg-interactive-muted"
               aria-label={showUserId ? "Hide User ID" : "Show User ID"}
             >
               {showUserId ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -170,7 +193,7 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                       toast.success("User ID copied to clipboard");
                     }
                   }}
-                  className="p-1 rounded hover:bg-container flex-shrink-0"
+                  className="p-1 rounded hover:bg-interactive-muted flex-shrink-0"
                   aria-label="Copy User ID"
                 >
                   <Copy size={14} />
@@ -182,6 +205,69 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
       );
     }
     return "Guest";
+  };
+
+  // Helper function to render section title
+  const renderSectionTitle = (title) => {
+    if (isCollapsed) {
+      return (
+        <div className="flex justify-center my-2">
+          <div className="w-8 h-0.5 bg-border-primary"></div>
+        </div>
+      );
+    } else {
+      return (
+        <div className="px-4 py-2 text-xs font-medium text-text-muted uppercase tracking-wider">
+          {title}
+        </div>
+      );
+    }
+  };
+
+  // Render floating menu for collapsed state
+  const renderFloatingMenu = (items, isOpen, menuRef, title) => {
+    if (!isOpen) return null;
+    
+    return (
+      <motion.div
+        ref={menuRef}
+        initial={{ opacity: 0, scale: 0.95, y: -5 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: -5 }}
+        className="absolute left-20 z-50 bg-surface-card rounded-lg shadow-lg border border-border-primary py-2 min-w-[180px]"
+        style={{
+          background: "var(--surface-card)",
+          top: title === "Admin" ? "calc(50% - 80px)" : "calc(100% - 120px)",
+        }}
+      >
+        <div className="px-3 py-1 text-sm font-medium text-text-secondary border-b border-border-primary mb-1">
+          {title}
+        </div>
+        {items.map((item) => (
+          <motion.button
+            key={item.id}
+            whileHover={{ x: 5, backgroundColor: "var(--interactive-muted)" }}
+            onClick={() => {
+              if (item.action) {
+                item.action();
+              } else {
+                setActiveSection(item.id);
+              }
+              title === "Admin" ? setIsAdminMenuOpen(false) : setIsGeneralMenuOpen(false);
+              if (window.innerWidth < 1024) toggleSidebar();
+            }}
+            className={`w-full flex items-center px-4 py-2 ${
+              activeSection === item.id
+                ? "text-primary font-medium"
+                : "text-text-primary hover:text-primary"
+            }`}
+          >
+            <item.icon className="w-4 h-4 mr-3" />
+            <span>{item.label}</span>
+          </motion.button>
+        ))}
+      </motion.div>
+    );
   };
 
   return (
@@ -292,7 +378,7 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
         </motion.div>
 
         {/* Navigation */}
-        <div className="flex-1 overflow-y-auto py-4">
+        <div className="flex-1 overflow-y-auto py-2">
           <nav>
             <motion.ul
               className="space-y-1 px-2"
@@ -306,6 +392,17 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                 },
               }}
             >
+              {/* User Navigation Section */}
+              <motion.li
+                variants={{
+                  hidden: { opacity: 0 },
+                  visible: { opacity: 1 },
+                }}
+                className="pt-2"
+              >
+                {renderSectionTitle("Dashboard")}
+              </motion.li>
+
               {userNavItems.map((item) => (
                 <motion.li
                   key={item.id}
@@ -346,6 +443,7 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                 </motion.li>
               ))}
 
+              {/* Admin Section */}
               {isAdmin && (
                 <>
                   <motion.li
@@ -355,15 +453,7 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                       visible: { opacity: 1 },
                     }}
                   >
-                    {isCollapsed ? (
-                      <div className="flex justify-center">
-                        <div className="w-8 h-0.5 bg-border-primary"></div>
-                      </div>
-                    ) : (
-                      <div className="px-4 py-2 text-xs font-medium text-text-muted uppercase tracking-wider">
-                        Admin
-                      </div>
-                    )}
+                    {renderSectionTitle("Admin")}
                   </motion.li>
 
                   {isCollapsed ? (
@@ -377,44 +467,15 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                         whileHover="hover"
                         variants={navItemVariants}
                         onClick={() => setIsAdminMenuOpen(!isAdminMenuOpen)}
-                        className="w-full flex justify-center px-4 py-3 rounded-lg text-text-primary hover:bg-background-secondary hover:text-primary transition-all duration-200"
+                        className={`w-full flex justify-center px-4 py-3 rounded-lg text-text-primary hover:bg-background-secondary hover:text-primary transition-all duration-200 ${
+                          isAdminMenuOpen ? "bg-background-secondary text-primary" : ""
+                        }`}
                       >
-                        <MdAdminPanelSettings className="w-7 h-7" />
+                        <MdAdminPanelSettings className="w-6 h-6" />
                       </motion.button>
 
                       <AnimatePresence>
-                        {isAdminMenuOpen && (
-                          <motion.div
-                            ref={adminMenuRef}
-                            initial={{ opacity: 0, scale: 0.95, y: -5 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: -5 }}
-                            className="absolute left-20 -mt-24 z-50 bg-surface-card rounded-lg shadow-lg border border-border-primary py-2 min-w-[180px]"
-                            style={{
-                              background: "var(--surface-card)",
-                            }}
-                          >
-                            {adminNavItems.map((item) => (
-                              <motion.button
-                                key={item.id}
-                                whileHover={{ x: 5, backgroundColor: "var(--interactive-muted)" }}
-                                onClick={() => {
-                                  setActiveSection(item.id);
-                                  setIsAdminMenuOpen(false);
-                                  if (window.innerWidth < 1024) toggleSidebar();
-                                }}
-                                className={`w-full flex items-center px-4 py-2 ${
-                                  activeSection === item.id
-                                    ? "text-primary font-medium"
-                                    : "text-text-primary hover:text-primary"
-                                }`}
-                              >
-                                <item.icon className="w-4 h-4 mr-3" />
-                                <span>{item.label}</span>
-                              </motion.button>
-                            ))}
-                          </motion.div>
-                        )}
+                        {renderFloatingMenu(adminNavItems, isAdminMenuOpen, adminMenuRef, "Admin")}
                       </AnimatePresence>
                     </motion.li>
                   ) : (
@@ -458,76 +519,77 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
                   )}
                 </>
               )}
+
+              {/* General Section - New Addition */}
+              <motion.li
+                className="pt-4 mt-auto"
+                variants={{
+                  hidden: { opacity: 0 },
+                  visible: { opacity: 1 },
+                }}
+              >
+                {renderSectionTitle("General")}
+              </motion.li>
+
+              {isCollapsed ? (
+                <motion.li
+                  variants={{
+                    hidden: { y: 20, opacity: 0 },
+                    visible: { y: 0, opacity: 1 },
+                  }}
+                >
+                  <motion.button
+                    whileHover="hover"
+                    variants={navItemVariants}
+                    onClick={() => setIsGeneralMenuOpen(!isGeneralMenuOpen)}
+                    className={`w-full flex justify-center px-4 py-3 rounded-lg text-text-primary hover:bg-background-secondary hover:text-primary transition-all duration-200 ${
+                      isGeneralMenuOpen ? "bg-background-secondary text-primary" : ""
+                    }`}
+                  >
+                    <Settings className="w-5 h-5" />
+                  </motion.button>
+
+                  <AnimatePresence>
+                    {renderFloatingMenu(generalNavItems, isGeneralMenuOpen, generalMenuRef, "General")}
+                  </AnimatePresence>
+                </motion.li>
+              ) : (
+                generalNavItems.map((item) => (
+                  <motion.li
+                    key={item.id}
+                    variants={{
+                      hidden: { y: 20, opacity: 0 },
+                      visible: { y: 0, opacity: 1 },
+                    }}
+                  >
+                    <motion.button
+                      whileHover="hover"
+                      variants={navItemVariants}
+                      onClick={item.action}
+                      className="w-full flex items-center px-4 py-3 rounded-lg text-text-primary hover:bg-background-secondary hover:text-primary transition-all duration-200"
+                    >
+                      <item.icon className="w-5 h-5 mr-3" />
+                      <span>{item.label}</span>
+                    </motion.button>
+                  </motion.li>
+                ))
+              )}
             </motion.ul>
           </nav>
         </div>
 
-        {/* Footer */}
-        <motion.div
-          className="p-4 border-t border-border-primary"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-        >
-          <div className="flex flex-col space-y-2">
-            <motion.button
-              whileHover="hover"
-              variants={navItemVariants}
-              onClick={toggleTheme}
-              className={`flex items-center ${isCollapsed ? "justify-center" : ""} px-4 py-2 rounded-lg text-text-primary hover:bg-background-secondary hover:text-primary transition-all duration-200`}
-            >
-              {theme === "dark" ? (
-                <motion.div
-                  whileHover={{ rotate: 90 }}
-                  transition={{ type: "spring", stiffness: 300 }}
-                >
-                  <FaMoon
-                    className={`${
-                      isCollapsed ? "w-5 h-5" : "w-5 h-5 mr-3"
-                    } ${!isCollapsed ? "fill-text-primary" : ""}`}
-                  />
-                </motion.div>
-              ) : (
-                <motion.div
-                  whileHover={{ rotate: -90 }}
-                  transition={{ type: "spring", stiffness: 300 }}
-                >
-                  <FaSun
-                    className={`${
-                      isCollapsed ? "w-5 h-5 fill-yellow-500" : "w-5 h-5 mr-3"
-                    } ${!isCollapsed ? "fill-yellow-500" : ""}`}
-                  />
-                </motion.div>
-              )}
-              {!isCollapsed && <span>{theme === "dark" ? "Use Light Mode" : "Use Dark Mode"}</span>}
-            </motion.button>
-
-            <motion.button
-              whileHover="hover"
-              variants={navItemVariants}
-              onClick={handleReturn}
-              className={`flex items-center ${
-                isCollapsed ? "justify-center" : ""
-              } px-4 py-2 rounded-lg text-primary hover:bg-primary/10 transition-all duration-200`}
-            >
-              <FaHome className={`${isCollapsed ? "w-5 h-5" : "w-5 h-5 mr-3"}`} />
-              {!isCollapsed && <span>Return Home</span>}
-            </motion.button>
-          </div>
-        </motion.div>
+        {/* Mobile Toggle Button */}
+        <div className="fixed top-4 left-4 lg:hidden z-50">
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={toggleSidebar}
+            className="p-2 rounded-full bg-surface-card shadow-lg border border-border-primary text-text-primary"
+          >
+            {isOpen ? <FaTimes /> : <FaBars />}
+          </motion.button>
+        </div>
       </motion.div>
-
-      {/* Mobile Toggle Button (No Animation) */}
-      <button
-        onClick={toggleSidebar}
-        className="fixed top-4 left-4 z-30 lg:hidden p-3 rounded-full bg-primary text-text-inverted shadow-lg"
-        style={{
-          background: "var(--primary)",
-          boxShadow: "0 4px 12px rgba(15, 118, 110, 0.3)",
-        }}
-      >
-        {isOpen ? <FaTimes className="w-5 h-5" /> : <FaBars className="w-5 h-5" />}
-      </button>
     </>
   );
 };

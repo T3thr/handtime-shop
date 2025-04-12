@@ -33,9 +33,9 @@ export async function GET(request) {
     // Get total count for pagination
     const total = await User.countDocuments(query);
     
-    // Get paginated users with full details
+    // Get paginated users with full details - explicitly include createdAt
     const users = await User.find(query)
-      .select('name email username avatar role isVerified stats lastLogin wishlist')
+      .select('name email username avatar role isVerified stats lastLogin wishlist createdAt')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)

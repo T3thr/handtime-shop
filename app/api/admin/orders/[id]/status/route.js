@@ -29,18 +29,18 @@ export async function PUT(request, { params }) {
 
     // Update the order status
     const updatedOrder = await Order.findByIdAndUpdate(
-      id,
-      {
-        status: data.status,
-        updatedBy: session.user.id,
-        updatedAt: new Date(),
-      },
-      { new: true, runValidators: true }
-    ).populate({
-      path: 'userId',
-      select: 'name email avatar role',
-      model: User
-    });
+        id,
+        {
+          status: data.status,
+          updatedBy: session.user.id,
+          updatedAt: new Date(),
+        },
+        { new: true, runValidators: true }
+      ).populate({
+        path: 'userId',
+        //select: 'name email avatar role cart',
+        model: User
+      });
 
     if (!updatedOrder) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });

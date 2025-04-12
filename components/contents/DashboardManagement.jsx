@@ -1,10 +1,12 @@
 "use client";
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { FaUsers, FaShoppingCart, FaChartLine, FaEdit, FaTrash } from 'react-icons/fa';
-import { useAllOrders, updateOrderStatus, deleteOrder, useUsers, updateUser } from '@/backend/lib/dashboardAction';
-import { toast } from 'react-toastify';
-import Image from 'next/image';
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { FaUsers, FaShoppingCart, FaChartLine, FaEdit, FaTrash, FaStar , FaSortUp , FaSortDown } from "react-icons/fa";
+import { useAllOrders, updateOrderStatus, deleteOrder, useUsers, updateUser } from "@/backend/lib/dashboardAction";
+import { toast } from "react-toastify";
+import Image from "next/image";
+import AllOrderModal from "./AllOrderModal";
+import { useAllReviews, updateReviewStatus, deleteReview } from "@/hooks/reviewHooks";
 
 // User Management Component
 export const UserManagement = () => {
@@ -12,26 +14,27 @@ export const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState({
-    name: '',
-    email: '',
-    role: ''
+    name: "",
+    email: "",
+    role: "",
   });
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
 
   const handleEditUser = (user) => {
     setSelectedUser(user);
     setEditForm({
       name: user.name,
       email: user.email,
-      role: user.role
+      role: user.role,
     });
     setIsEditModalOpen(true);
   };
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
-    setEditForm(prev => ({
+    setEditForm((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
@@ -42,21 +45,72 @@ export const UserManagement = () => {
       setIsEditModalOpen(false);
       refetchUsers();
     } catch (error) {
-      console.error('Error updating user:', error);
-      toast.error('Failed to update user');
+      console.error("Error updating user:", error);
+      toast.error("Failed to update user");
     }
   };
+
+  const requestSort = (key) => {
+    let direction = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    } else if (sortConfig.key === key && sortConfig.direction === 'descending') {
+      direction = null;
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key) => {
+    if (sortConfig.key !== key) {
+      return null;
+    }
+    return sortConfig.direction === 'ascending' ? <FaSortUp className="inline ml-1" /> : <FaSortDown className="inline ml-1" />;
+  };
+
+  const sortedUsers = React.useMemo(() => {
+    let sortableUsers = [...(users || [])];
+    if (sortConfig.key && sortConfig.direction) {
+      sortableUsers.sort((a, b) => {
+        if (sortConfig.key === 'createdAt') {
+          const dateA = new Date(a.createdAt);
+          const dateB = new Date(b.createdAt);
+          
+          if (sortConfig.direction === 'ascending') {
+            return dateA - dateB;
+          }
+          return dateB - dateA;
+        } else if (sortConfig.key === 'lastLogin') {
+          const dateA = a.lastLogin ? new Date(a.lastLogin) : new Date(0);
+          const dateB = b.lastLogin ? new Date(b.lastLogin) : new Date(0);
+          
+          if (sortConfig.direction === 'ascending') {
+            return dateA - dateB;
+          }
+          return dateB - dateA;
+        } else {
+          if (a[sortConfig.key] < b[sortConfig.key]) {
+            return sortConfig.direction === 'ascending' ? -1 : 1;
+          }
+          if (a[sortConfig.key] > b[sortConfig.key]) {
+            return sortConfig.direction === 'ascending' ? 1 : -1;
+          }
+          return 0;
+        }
+      });
+    }
+    return sortableUsers;
+  }, [users, sortConfig]);
 
   if (isLoading) return <div className="text-center py-10">Loading users...</div>;
   if (isError) return <div className="text-center py-10 text-red-500">Failed to load users</div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">User Management</h2>
-        <div className="flex space-x-2">
-          <select 
-            className="px-3 py-2 border rounded-md bg-background text-text-primary"
+    <div className="space-y-6 px-4 sm:px-0">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <h2 className="text-xl sm:text-2xl font-bold">User Management</h2>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <select
+            className="w-full sm:w-auto px-3 py-2 border rounded-md bg-background text-text-primary"
             value={pagination.limit}
             onChange={(e) => changeLimit(Number(e.target.value))}
           >
@@ -71,21 +125,49 @@ export const UserManagement = () => {
         <table className="min-w-full bg-background border border-border-primary rounded-lg">
           <thead className="bg-background-secondary">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">User</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Role</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Joined</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Actions</th>
+              <th 
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort("name")}
+              >
+                User {getSortIcon("name")}
+              </th>
+              <th 
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort("email")}
+              >
+                Email {getSortIcon("email")}
+              </th>
+              <th 
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort("role")}
+              >
+                Role {getSortIcon("role")}
+              </th>
+              <th 
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort("createdAt")}
+              >
+                Joined {getSortIcon("createdAt")}
+              </th>
+              <th 
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort("lastLogin")}
+              >
+                Last Login {getSortIcon("lastLogin")}
+              </th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border-primary">
-            {users.map((user) => (
+            {sortedUsers.map((user) => (
               <tr key={user._id} className="hover:bg-background-hover transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div className="h-10 w-10 flex-shrink-0 relative rounded-full overflow-hidden">
-                      <Image 
-                        src={user.avatar || "/images/avatar-placeholder.jpg"} 
+                      <Image
+                        src={user.avatar || "/images/avatar-placeholder.jpg"}
                         alt={user.name}
                         fill
                         className="object-cover"
@@ -96,19 +178,24 @@ export const UserManagement = () => {
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">{user.email}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                    user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
-                  }`}>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-primary">{user.email}</td>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                  <span
+                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      user.role === "admin" ? "bg-purple-100 text-purple-800" : "bg-green-100 text-green-800"
+                    }`}
+                  >
                     {user.role}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
-                  {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
+                  {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "N/A"}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button 
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
+                  {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : "Never"}
+                </td>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <button
                     onClick={() => handleEditUser(user)}
                     className="text-indigo-600 hover:text-indigo-900 mr-3"
                   >
@@ -122,18 +209,19 @@ export const UserManagement = () => {
       </div>
 
       {/* Pagination */}
-      <div className="flex justify-between items-center mt-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mt-4 gap-4">
         <div className="text-sm text-text-secondary">
-          Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} users
+          Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
+          {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} users
         </div>
         <div className="flex space-x-2">
           <button
             onClick={() => changePage(pagination.page - 1)}
             disabled={pagination.page === 1}
             className={`px-3 py-1 rounded-md ${
-              pagination.page === 1 
-                ? 'bg-background-secondary text-text-secondary cursor-not-allowed' 
-                : 'bg-primary text-white hover:bg-primary-hover'
+              pagination.page === 1
+                ? "bg-background-secondary text-text-secondary cursor-not-allowed"
+                : "bg-primary text-white hover:bg-primary-hover"
             }`}
           >
             Previous
@@ -142,9 +230,9 @@ export const UserManagement = () => {
             onClick={() => changePage(pagination.page + 1)}
             disabled={pagination.page === pagination.totalPages}
             className={`px-3 py-1 rounded-md ${
-              pagination.page === pagination.totalPages 
-                ? 'bg-background-secondary text-text-secondary cursor-not-allowed' 
-                : 'bg-primary text-white hover:bg-primary-hover'
+              pagination.page === pagination.totalPages
+                ? "bg-background-secondary text-text-secondary cursor-not-allowed"
+                : "bg-primary text-white hover:bg-primary-hover"
             }`}
           >
             Next
@@ -154,14 +242,12 @@ export const UserManagement = () => {
 
       {/* Edit User Modal */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-background rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-xl font-bold mb-4">Edit User</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+          <div className="bg-background rounded-lg p-4 sm:p-6 w-full max-w-md">
+            <h3 className="text-lg sm:text-xl font-bold mb-4">Edit User</h3>
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
-                <label className="block text-text-secondary text-sm font-bold mb-2">
-                  Name
-                </label>
+                <label className="block text-text-secondary text-sm font-bold mb-2">Name</label>
                 <input
                   type="text"
                   name="name"
@@ -172,9 +258,7 @@ export const UserManagement = () => {
                 />
               </div>
               <div className="mb-4">
-                <label className="block text-text-secondary text-sm font-bold mb-2">
-                  Email
-                </label>
+                <label className="block text-text-secondary text-sm font-bold mb-2">Email</label>
                 <input
                   type="email"
                   name="email"
@@ -185,9 +269,7 @@ export const UserManagement = () => {
                 />
               </div>
               <div className="mb-4">
-                <label className="block text-text-secondary text-sm font-bold mb-2">
-                  Role
-                </label>
+                <label className="block text-text-secondary text-sm font-bold mb-2">Role</label>
                 <select
                   name="role"
                   value={editForm.role}
@@ -223,92 +305,121 @@ export const UserManagement = () => {
 
 // Order Management Component
 export const OrderManagement = () => {
-  const [statusFilter, setStatusFilter] = useState('all');
-  const { 
-    orders, 
-    isLoading, 
-    isError, 
-    pagination, 
-    changePage, 
-    changeLimit, 
+  const [statusFilter, setStatusFilter] = useState("all");
+  const {
+    orders,
+    isLoading,
+    isError,
+    pagination,
+    changePage,
+    changeLimit,
     updateOrderStatus,
     deleteOrder,
-    refetch: refetchOrders
+    refetch: refetchOrders,
   } = useAllOrders(1, 10, statusFilter);
-  
+
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [newStatus, setNewStatus] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
 
   const handleViewOrder = (order) => {
     setSelectedOrder(order);
     setIsViewModalOpen(true);
   };
 
-  const handleEditStatus = (order) => {
-    setSelectedOrder(order);
-    setNewStatus(order.status);
-    setIsEditModalOpen(true);
-  };
-
-  const handleDeleteOrder = (order) => {
-    setSelectedOrder(order);
-    setIsDeleteModalOpen(true);
-  };
-
-  const confirmUpdateStatus = async () => {
+  const handleUpdateStatus = async (orderId, newStatus) => {
     try {
-      await updateOrderStatus(selectedOrder._id, newStatus);
-      setIsEditModalOpen(false);
-      await refetchOrders();
-      toast.success('Order status updated successfully');
+      await updateOrderStatus(orderId, newStatus);
+      refetchOrders();
     } catch (error) {
-      console.error('Error updating order status:', error);
-      toast.error('Failed to update order status');
+      throw error; // Let AllOrderModal handle the error
     }
   };
 
-  const confirmDeleteOrder = async () => {
+  const handleDeleteOrder = async (orderId) => {
     try {
-      await deleteOrder(selectedOrder._id);
-      setIsDeleteModalOpen(false);
+      await deleteOrder(orderId);
       refetchOrders();
-      toast.success('Order deleted successfully');
     } catch (error) {
-      console.error('Error deleting order:', error);
-      toast.error('Failed to delete order');
+      throw error; // Let AllOrderModal handle the error
     }
   };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'processing':
-        return 'bg-blue-100 text-blue-800';
-      case 'shipped':
-        return 'bg-purple-100 text-purple-800';
-      case 'delivered':
-        return 'bg-green-100 text-green-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "processing":
+        return "bg-blue-100 text-blue-800";
+      case "shipped":
+        return "bg-purple-100 text-purple-800";
+      case "delivered":
+        return "bg-green-100 text-green-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
+
+  const requestSort = (key) => {
+    let direction = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    } else if (sortConfig.key === key && sortConfig.direction === 'descending') {
+      direction = null;
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key) => {
+    if (sortConfig.key !== key) {
+      return null;
+    }
+    return sortConfig.direction === 'ascending' ? <FaSortUp className="inline ml-1 text-secondary" /> : <FaSortDown className="inline ml-1 text-secondary" />;
+  };
+
+  const sortedOrders = React.useMemo(() => {
+    let sortableOrders = [...(orders || [])];
+    if (sortConfig.key && sortConfig.direction) {
+      sortableOrders.sort((a, b) => {
+        if (sortConfig.key === 'createdAt') {
+          const dateA = new Date(a.createdAt);
+          const dateB = new Date(b.createdAt);
+          
+          if (sortConfig.direction === 'ascending') {
+            return dateA - dateB;
+          }
+          return dateB - dateA;
+        } else if (sortConfig.key === 'totalAmount') {
+          if (sortConfig.direction === 'ascending') {
+            return a.totalAmount - b.totalAmount;
+          }
+          return b.totalAmount - a.totalAmount;
+        } else {
+          if (a[sortConfig.key] < b[sortConfig.key]) {
+            return sortConfig.direction === 'ascending' ? -1 : 1;
+          }
+          if (a[sortConfig.key] > b[sortConfig.key]) {
+            return sortConfig.direction === 'ascending' ? 1 : -1;
+          }
+          return 0;
+        }
+      });
+    }
+    return sortableOrders;
+  }, [orders, sortConfig]);
 
   if (isLoading) return <div className="text-center py-10">Loading orders...</div>;
   if (isError) return <div className="text-center py-10 text-red-500">Failed to load orders</div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Order Management</h2>
-        <div className="flex space-x-2">
-          <select 
-            className="px-3 py-2 border rounded-md bg-background text-text-primary"
+    <div className="space-y-6 px-4 sm:px-0">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <h2 className="text-xl sm:text-2xl font-bold">Order Management</h2>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <select
+            className="w-full sm:w-auto px-3 py-2 border rounded-md bg-background text-text-primary"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -319,8 +430,8 @@ export const OrderManagement = () => {
             <option value="delivered">Delivered</option>
             <option value="cancelled">Cancelled</option>
           </select>
-          <select 
-            className="px-3 py-2 border rounded-md bg-background text-text-primary"
+          <select
+            className="w-full sm:w-auto px-3 py-2 border rounded-md bg-background text-text-primary"
             value={pagination.limit}
             onChange={(e) => changeLimit(Number(e.target.value))}
           >
@@ -335,27 +446,53 @@ export const OrderManagement = () => {
         <table className="min-w-full bg-background border border-border-primary rounded-lg">
           <thead className="bg-background-secondary">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Order ID</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Customer</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Date</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Total</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Actions</th>
+              <th 
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort("_id")}
+              >
+                Order ID {getSortIcon("_id")}
+              </th>
+              <th 
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider"
+              >
+                Customer
+              </th>
+              <th 
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort("createdAt")}
+              >
+                Date {getSortIcon("createdAt")}
+              </th>
+              <th 
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort("status")}
+              >
+                Status {getSortIcon("status")}
+              </th>
+              <th 
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort("totalAmount")}
+              >
+                Total {getSortIcon("totalAmount")}
+              </th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border-primary">
-            {orders.map((order) => (
+            {sortedOrders.map((order) => (
               <tr key={order._id} className="hover:bg-background-hover transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-primary">
                   {order._id.substring(0, 8)}...
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     {order.userId && (
                       <>
                         <div className="h-10 w-10 flex-shrink-0 relative rounded-full overflow-hidden">
-                          <Image 
-                            src={order.userId.avatar || "/images/avatar-placeholder.jpg"} 
+                          <Image
+                            src={order.userId.avatar || "/images/avatar-placeholder.jpg"}
                             alt={order.userId.name}
                             fill
                             className="object-cover"
@@ -374,35 +511,27 @@ export const OrderManagement = () => {
                     )}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
-                  {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
+                  {new Date(order.createdAt).toLocaleDateString()}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                  <span
+                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
+                      order.status
+                    )}`}
+                  >
                     {order.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-primary">
                   ${order.totalAmount.toFixed(2)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button 
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <button
                     onClick={() => handleViewOrder(order)}
                     className="text-blue-600 hover:text-blue-900 mr-3"
                   >
                     View
-                  </button>
-                  <button 
-                    onClick={() => handleEditStatus(order)}
-                    className="text-indigo-600 hover:text-indigo-900 mr-3"
-                  >
-                    <FaEdit className="inline" /> Status
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteOrder(order)}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    <FaTrash className="inline" />
                   </button>
                 </td>
               </tr>
@@ -412,18 +541,19 @@ export const OrderManagement = () => {
       </div>
 
       {/* Pagination */}
-      <div className="flex justify-between items-center mt-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mt-4 gap-4">
         <div className="text-sm text-text-secondary">
-          Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} orders
+          Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
+          {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} orders
         </div>
         <div className="flex space-x-2">
           <button
             onClick={() => changePage(pagination.page - 1)}
             disabled={pagination.page === 1}
             className={`px-3 py-1 rounded-md ${
-              pagination.page === 1 
-                ? 'bg-background-secondary text-text-secondary cursor-not-allowed' 
-                : 'bg-primary text-white hover:bg-primary-hover'
+              pagination.page === 1
+                ? "bg-background-secondary text-text-secondary cursor-not-allowed"
+                : "bg-primary text-white hover:bg-primary-hover"
             }`}
           >
             Previous
@@ -432,9 +562,9 @@ export const OrderManagement = () => {
             onClick={() => changePage(pagination.page + 1)}
             disabled={pagination.page === pagination.totalPages}
             className={`px-3 py-1 rounded-md ${
-              pagination.page === pagination.totalPages 
-                ? 'bg-background-secondary text-text-secondary cursor-not-allowed' 
-                : 'bg-primary text-white hover:bg-primary-hover'
+              pagination.page === pagination.totalPages
+                ? "bg-background-secondary text-text-secondary cursor-not-allowed"
+                : "bg-primary text-white hover:bg-primary-hover"
             }`}
           >
             Next
@@ -442,176 +572,365 @@ export const OrderManagement = () => {
         </div>
       </div>
 
-      {/* View Order Modal */}
-      {isViewModalOpen && selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-background rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">Order Details</h3>
-              <button 
-                onClick={() => setIsViewModalOpen(false)}
-                className="text-text-secondary hover:text-text-primary"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <h4 className="font-semibold mb-2">Order Information</h4>
-                <p><span className="text-text-secondary">Order ID:</span> {selectedOrder._id}</p>
-                <p><span className="text-text-secondary">Date:</span> {new Date(selectedOrder.createdAt).toLocaleString()}</p>
-                <p><span className="text-text-secondary">Status:</span> 
-                  <span className={`ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(selectedOrder.status)}`}>
-                    {selectedOrder.status}
-                  </span>
-                </p>
-                <p><span className="text-text-secondary">Payment Method:</span> {selectedOrder.paymentMethod}</p>
-              </div>
-              
-              <div>
-                <h4 className="font-semibold mb-2">Customer Information</h4>
-                {selectedOrder.userId ? (
-                  <>
-                    <div className="flex items-center mb-2">
-                      <div className="h-10 w-10 flex-shrink-0 relative rounded-full overflow-hidden">
-                        <Image 
-                          src={selectedOrder.userId.avatar || "/images/avatar-placeholder.jpg"} 
-                          alt={selectedOrder.userId.name}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                      <div className="ml-4">
-                        <p className="font-medium">{selectedOrder.userId.name}</p>
-                        <p className="text-sm text-text-secondary">{selectedOrder.userId.email}</p>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <p>Guest User</p>
-                )}
-                
-                <h4 className="font-semibold mt-4 mb-2">Shipping Address</h4>
-                <p>{selectedOrder.shippingAddress?.street}</p>
-                <p>{selectedOrder.shippingAddress?.city}, {selectedOrder.shippingAddress?.state} {selectedOrder.shippingAddress?.zipCode}</p>
-                <p>{selectedOrder.shippingAddress?.country}</p>
-              </div>
-            </div>
-            
-            <h4 className="font-semibold mb-2">Order Items</h4>
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-background border border-border-primary rounded-lg">
-                <thead className="bg-background-secondary">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Product</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Price</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Quantity</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-primary">
-                  {selectedOrder.items.map((item, index) => (
-                    <tr key={index} className="hover:bg-background-hover transition-colors">
-                      <td className="px-4 py-2 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="h-10 w-10 flex-shrink-0 relative rounded-md overflow-hidden">
-                            <Image 
-                              src={item.image || "/images/placeholder.jpg"} 
-                              alt={item.name}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-text-primary">{item.name}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-text-primary">
-                        ${item.price.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-text-primary">
-                        {item.quantity}
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-text-primary">
-                        ${(item.price * item.quantity).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            
-            <div className="mt-6 text-right">
-              <p className="text-text-secondary">Subtotal: ${selectedOrder.subtotal?.toFixed(2) || '0.00'}</p>
-              <p className="text-text-secondary">Shipping: ${selectedOrder.shippingCost?.toFixed(2) || '0.00'}</p>
-              <p className="text-text-secondary">Tax: ${selectedOrder.taxAmount?.toFixed(2) || '0.00'}</p>
-              <p className="font-bold text-lg">Total: ${selectedOrder.totalAmount.toFixed(2)}</p>
-            </div>
-            
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setIsViewModalOpen(false)}
-                className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-hover"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* View Order Modal with AllOrderModal */}
+      <AllOrderModal
+        isOpen={isViewModalOpen}
+        onClose={() => setIsViewModalOpen(false)}
+        order={selectedOrder}
+        isAdmin={true}
+        onUpdateStatus={handleUpdateStatus}
+        onDeleteOrder={handleDeleteOrder}
+      />
+    </div>
+  );
+};
 
-      {/* Edit Status Modal */}
-      {isEditModalOpen && selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-background rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-xl font-bold mb-4">Update Order Status</h3>
-            <p className="mb-4">Order ID: {selectedOrder._id}</p>
-            
-            <div className="mb-4">
-              <label className="block text-text-secondary text-sm font-bold mb-2">
-                Status
-              </label>
-              <select
-                value={newStatus}
-                onChange={(e) => setNewStatus(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md bg-background text-text-primary"
-              >
-                <option value="pending">Pending</option>
-                <option value="processing">Processing</option>
-                <option value="shipped">Shipped</option>
-                <option value="delivered">Delivered</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </div>
-            
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={() => setIsEditModalOpen(false)}
-                className="px-4 py-2 border border-border-primary rounded-md hover:bg-background-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmUpdateStatus}
-                className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-hover"
-              >
-                Update Status
-              </button>
-            </div>
-          </div>
+// Review Management Component
+export const ReviewManagement = () => {
+  const [statusFilter, setStatusFilter] = useState("all");
+  const {
+    reviews,
+    isLoading,
+    isError,
+    pagination,
+    changePage,
+    changeLimit,
+    updateReviewStatus,
+    deleteReview,
+    refetch: refetchReviews,
+  } = useAllReviews(1, 10, statusFilter);
+
+  const [selectedReview, setSelectedReview] = useState(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [newStatus, setNewStatus] = useState("");
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+
+  const handleDeleteClick = (review) => {
+    setSelectedReview(review);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleStatusClick = (review, status) => {
+    setSelectedReview(review);
+    setNewStatus(status);
+    setIsStatusModalOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      await deleteReview(selectedReview._id);
+      toast.success("Review deleted successfully");
+      setIsDeleteModalOpen(false);
+      refetchReviews();
+    } catch (error) {
+      console.error("Error deleting review:", error);
+      toast.error("Failed to delete review");
+    }
+  };
+
+  const handleStatusConfirm = async () => {
+    try {
+      await updateReviewStatus(selectedReview._id, newStatus);
+      toast.success(`Review ${newStatus} successfully`);
+      setIsStatusModalOpen(false);
+      refetchReviews();
+    } catch (error) {
+      console.error("Error updating review status:", error);
+      toast.error("Failed to update review status");
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "approved":
+        return "bg-green-100 text-green-800";
+      case "rejected":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const requestSort = (key) => {
+    let direction = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    } else if (sortConfig.key === key && sortConfig.direction === 'descending') {
+      direction = null;
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key) => {
+    if (sortConfig.key !== key) {
+      return null;
+    }
+    return sortConfig.direction === 'ascending' ? <FaSortUp className="inline ml-1" /> : <FaSortDown className="inline ml-1" />;
+  };
+
+  const sortedReviews = React.useMemo(() => {
+    let sortableReviews = [...(reviews || [])];
+    if (sortConfig.key && sortConfig.direction) {
+      sortableReviews.sort((a, b) => {
+        if (sortConfig.key === 'createdAt') {
+          const dateA = new Date(a.createdAt);
+          const dateB = new Date(b.createdAt);
+          
+          if (sortConfig.direction === 'ascending') {
+            return dateA - dateB;
+          }
+          return dateB - dateA;
+        } else if (sortConfig.key === 'rating') {
+          if (sortConfig.direction === 'ascending') {
+            return a.rating - b.rating;
+          }
+          return b.rating - a.rating;
+        } else {
+          if (a[sortConfig.key] < b[sortConfig.key]) {
+            return sortConfig.direction === 'ascending' ? -1 : 1;
+          }
+          if (a[sortConfig.key] > b[sortConfig.key]) {
+            return sortConfig.direction === 'ascending' ? 1 : -1;
+          }
+          return 0;
+        }
+      });
+    }
+    return sortableReviews;
+  }, [reviews, sortConfig]);
+
+  if (isLoading) return <div className="text-center py-10">Loading reviews...</div>;
+  if (isError) return <div className="text-center py-10 text-red-500">Failed to load reviews</div>;
+
+  return (
+    <div className="space-y-6 px-4 sm:px-0">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <h2 className="text-xl sm:text-2xl font-bold">Review Management</h2>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <select
+            className="w-full sm:w-auto px-3 py-2 border rounded-md bg-background text-text-primary"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="all">All Reviews</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <select
+            className="w-full sm:w-auto px-3 py-2 border rounded-md bg-background text-text-primary"
+            value={pagination.limit}
+            onChange={(e) => changeLimit(Number(e.target.value))}
+          >
+            <option value={5}>5 per page</option>
+            <option value={10}>10 per page</option>
+            <option value={20}>20 per page</option>
+          </select>
         </div>
-      )}
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-background border border-border-primary rounded-lg">
+          <thead className="bg-background-secondary">
+            <tr>
+              <th 
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort("productId.name")}
+              >
+                Product {getSortIcon("productId.name")}
+              </th>
+              <th 
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort("userId.name")}
+              >
+                Customer {getSortIcon("userId.name")}
+              </th>
+              <th 
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort("rating")}
+              >
+                Rating {getSortIcon("rating")}
+              </th>
+              <th 
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider"
+              >
+                Review
+              </th>
+              <th 
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort("status")}
+              >
+                Status {getSortIcon("status")}
+              </th>
+              <th 
+                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort("createdAt")}
+              >
+                Date {getSortIcon("createdAt")}
+              </th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border-primary">
+            {sortedReviews.map((review) => (
+              <tr key={review._id} className="hover:bg-background-hover transition-colors">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    <div className="h-10 w-10 flex-shrink-0 relative rounded-md overflow-hidden">
+                      <Image
+                        src={review.productId?.images?.[0]?.url || "/images/placeholder.jpg"}
+                        alt={review.productId?.name || "Product"}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="ml-4">
+                      <div className="text-sm font-medium text-text-primary">{review.productId?.name || "Unknown Product"}</div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 flex-shrink-0 relative rounded-full overflow-hidden">
+                      <Image
+                        src={review.userId?.avatar || "/images/avatar-placeholder.jpg"}
+                        alt={review.userId?.name || "User"}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="ml-3">
+                      <div className="text-sm font-medium text-text-primary">{review.userId?.name || "Anonymous"}</div>
+                      <div className="text-xs text-text-secondary">{review.userId?.email || ""}</div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center text-yellow-400">
+                    {[...Array(5)].map((_, i) => (
+                      <FaStar
+                        key={i}
+                        className={i < review.rating ? "text-yellow-400" : "text-gray-300"}
+                        size={16}
+                      />
+                    ))}
+                    <span className="ml-1 text-text-primary">{review.rating}</span>
+                  </div>
+                </td>
+                <td className="px-4 sm:px-6 py-4">
+                  <div className="text-sm text-text-primary max-w-xs truncate">
+                    {review.title && <span className="font-medium">{review.title}: </span>}
+                    {review.comment}
+                  </div>
+                  {review.images && review.images.length > 0 && (
+                    <div className="flex mt-1 space-x-1">
+                      {review.images.slice(0, 3).map((image, idx) => (
+                        <div key={idx} className="h-6 w-6 relative rounded overflow-hidden">
+                          <Image src={image} alt={`Review image ${idx + 1}`} fill className="object-cover" />
+                        </div>
+                      ))}
+                      {review.images.length > 3 && (
+                        <div className="h-6 w-6 bg-background-secondary rounded flex items-center justify-center text-xs">
+                          +{review.images.length - 3}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </td>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                  <span
+                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
+                      review.status
+                    )}`}
+                  >
+                    {review.status}
+                  </span>
+                </td>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
+                  {new Date(review.createdAt).toLocaleDateString()}
+                </td>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  {review.status === "pending" && (
+                    <>
+                      <button
+                        onClick={() => handleStatusClick(review, "approved")}
+                        className="text-green-600 hover:text-green-900 mr-2"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleStatusClick(review, "rejected")}
+                        className="text-red-600 hover:text-red-900 mr-2"
+                      >
+                        Reject
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => handleDeleteClick(review)}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    <FaTrash className="inline" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {reviews.length === 0 && (
+              <tr>
+                <td colSpan="7" className="px-4 sm:px-6 py-4 text-center text-text-secondary">
+                  No reviews found
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mt-4 gap-4">
+        <div className="text-sm text-text-secondary">
+          Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
+          {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} reviews
+        </div>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => changePage(pagination.page - 1)}
+            disabled={pagination.page === 1}
+            className={`px-3 py-1 rounded-md ${
+              pagination.page === 1
+                ? "bg-background-secondary text-text-secondary cursor-not-allowed"
+                : "bg-primary text-white hover:bg-primary-hover"
+            }`}
+          >
+            Previous
+          </button>
+          <button
+            onClick={() => changePage(pagination.page + 1)}
+            disabled={pagination.page === pagination.totalPages}
+            className={`px-3 py-1 rounded-md ${
+              pagination.page === pagination.totalPages
+                ? "bg-background-secondary text-text-secondary cursor-not-allowed"
+                : "bg-primary text-white hover:bg-primary-hover"
+            }`}
+          >
+            Next
+          </button>
+        </div>
+      </div>
 
       {/* Delete Confirmation Modal */}
-      {isDeleteModalOpen && selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-background rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-xl font-bold mb-4">Delete Order</h3>
-            <p className="mb-4">Are you sure you want to delete this order? This action cannot be undone.</p>
-            <p className="mb-4">Order ID: {selectedOrder._id.substring(0, 8)}...</p>
-            
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+          <div className="bg-background rounded-lg p-4 sm:p-6 w-full max-w-md">
+            <h3 className="text-lg sm:text-xl font-bold mb-4">Delete Review</h3>
+            <p className="mb-4 text-text-secondary">
+              Are you sure you want to delete this review? This action cannot be undone.
+            </p>
             <div className="flex justify-end space-x-2">
               <button
                 onClick={() => setIsDeleteModalOpen(false)}
@@ -620,10 +939,40 @@ export const OrderManagement = () => {
                 Cancel
               </button>
               <button
-                onClick={confirmDeleteOrder}
+                onClick={handleDeleteConfirm}
                 className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
               >
-                Delete Order
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Status Change Confirmation Modal */}
+      {isStatusModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+          <div className="bg-background rounded-lg p-4 sm:p-6 w-full max-w-md">
+            <h3 className="text-lg sm:text-xl font-bold mb-4">
+              {newStatus === "approved" ? "Approve" : "Reject"} Review
+            </h3>
+            <p className="mb-4 text-text-secondary">
+              Are you sure you want to {newStatus === "approved" ? "approve" : "reject"} this review?
+            </p>
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => setIsStatusModalOpen(false)}
+                className="px-4 py-2 border border-border-primary rounded-md hover:bg-background-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleStatusConfirm}
+                className={`px-4 py-2 ${
+                  newStatus === "approved" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+                } text-white rounded-md`}
+              >
+                Confirm
               </button>
             </div>
           </div>
@@ -634,50 +983,111 @@ export const OrderManagement = () => {
 };
 
 // Store Management Component
-export const ManageStore = ({ 
-  onAddProduct, 
-  onEditProduct, 
-  onDeleteProduct, 
-  onAddCategory, 
-  onEditCategory, 
+export const ManageStore = ({
+  onAddProduct,
+  onEditProduct,
+  onDeleteProduct,
+  onAddCategory,
+  onEditCategory,
   onDeleteCategory,
   products,
   categories,
   refetchProducts,
-  refetchCategories
+  refetchCategories,
 }) => {
-  const [activeTab, setActiveTab] = useState('products');
-  const [searchTerm, setSearchTerm] = useState('');
-  
+  const [activeTab, setActiveTab] = useState("products");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+
   // Filter products based on search term
-  const filteredProducts = products?.filter(product => 
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
-  
+  const filteredProducts =
+    products?.filter(
+      (product) =>
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    ) || [];
+
   // Filter categories based on search term
-  const filteredCategories = categories?.filter(category => 
-    category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    category.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const filteredCategories =
+    categories?.filter(
+      (category) =>
+        category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        category.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    ) || [];
+
+  const requestSort = (key) => {
+    let direction = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    } else if (sortConfig.key === key && sortConfig.direction === 'descending') {
+      direction = null;
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key) => {
+    if (sortConfig.key !== key) {
+      return null;
+    }
+    return sortConfig.direction === 'ascending' ? <FaSortUp className="inline ml-1" /> : <FaSortDown className="inline ml-1" />;
+  };
+
+  const sortedProducts = React.useMemo(() => {
+    let sortableProducts = [...filteredProducts];
+    if (sortConfig.key && sortConfig.direction) {
+      sortableProducts.sort((a, b) => {
+        if (sortConfig.key === 'price') {
+          if (sortConfig.direction === 'ascending') {
+            return a.price - b.price;
+          }
+          return b.price - a.price;
+        } else {
+          if (a[sortConfig.key] < b[sortConfig.key]) {
+            return sortConfig.direction === 'ascending' ? -1 : 1;
+          }
+          if (a[sortConfig.key] > b[sortConfig.key]) {
+            return sortConfig.direction === 'ascending' ? 1 : -1;
+          }
+          return 0;
+        }
+      });
+    }
+    return sortableProducts;
+  }, [filteredProducts, sortConfig]);
+
+  const sortedCategories = React.useMemo(() => {
+    let sortableCategories = [...filteredCategories];
+    if (sortConfig.key && sortConfig.direction) {
+      sortableCategories.sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableCategories;
+  }, [filteredCategories, sortConfig]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Store Management</h2>
-        <div className="flex space-x-2">
-          {activeTab === 'products' && (
+    <div className="space-y-6 px-4 sm:px-0">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <h2 className="text-xl sm:text-2xl font-bold">Store Management</h2>
+        <div className="flex flex-col sm:flex-row gap-2">
+          {activeTab === "products" && (
             <button
               onClick={onAddProduct}
-              className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-hover"
+              className="w-full sm:w-auto px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-hover"
             >
               Add Product
             </button>
           )}
-          {activeTab === 'categories' && (
+          {activeTab === "categories" && (
             <button
               onClick={onAddCategory}
-              className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-hover"
+              className="w-full sm:w-auto px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-hover"
             >
               Add Category
             </button>
@@ -688,21 +1098,21 @@ export const ManageStore = ({
       <div className="flex border-b border-border-primary">
         <button
           className={`px-4 py-2 font-medium ${
-            activeTab === 'products'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-text-secondary hover:text-text-primary'
+            activeTab === "products"
+              ? "border-b-2 border-primary text-primary"
+              : "text-text-secondary hover:text-text-primary"
           }`}
-          onClick={() => setActiveTab('products')}
+          onClick={() => setActiveTab("products")}
         >
           Products
         </button>
         <button
           className={`px-4 py-2 font-medium ${
-            activeTab === 'categories'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-text-secondary hover:text-text-primary'
+            activeTab === "categories"
+              ? "border-b-2 border-primary text-primary"
+              : "text-text-secondary hover:text-text-primary"
           }`}
-          onClick={() => setActiveTab('categories')}
+          onClick={() => setActiveTab("categories")}
         >
           Categories
         </button>
@@ -718,26 +1128,45 @@ export const ManageStore = ({
         />
       </div>
 
-      {activeTab === 'products' && (
+      {activeTab === "products" && (
         <div className="overflow-x-auto">
           <table className="min-w-full bg-background border border-border-primary rounded-lg">
             <thead className="bg-background-secondary">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Product</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Price</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Category</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Actions</th>
+                <th 
+                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                  onClick={() => requestSort("name")}
+                >
+                  Product {getSortIcon("name")}
+                </th>
+                <th 
+                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                  onClick={() => requestSort("price")}
+                >
+                  Price {getSortIcon("price")}
+                </th>
+                <th 
+                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                  onClick={() => requestSort("status")}
+                >
+                  Status {getSortIcon("status")}
+                </th>
+                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                  Category
+                </th>
+                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-primary">
-              {filteredProducts.map((product) => (
+              {sortedProducts.map((product) => (
                 <tr key={product._id} className="hover:bg-background-hover transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="h-10 w-10 flex-shrink-0 relative rounded-md overflow-hidden">
-                        <Image 
-                          src={product.images?.[0]?.url || "/images/placeholder.jpg"} 
+                        <Image
+                          src={product.images?.[0]?.url || "/images/placeholder.jpg"}
                           alt={product.name}
                           fill
                           className="object-cover"
@@ -749,27 +1178,29 @@ export const ManageStore = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
+                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-primary">
                     ${product.price.toFixed(2)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      product.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                      {product.status || 'active'}
+                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                    <span
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        product.status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {product.status || "active"}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
-                    {product.categories?.map(cat => cat.name || cat).join(', ') || 'Uncategorized'}
+                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-primary">
+                    {product.categories?.map((cat) => cat.name || cat).join(", ") || "Uncategorized"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button 
+                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button
                       onClick={() => onEditProduct(product)}
                       className="text-indigo-600 hover:text-indigo-900 mr-3"
                     >
                       <FaEdit className="inline" /> Edit
                     </button>
-                    <button 
+                    <button
                       onClick={() => onDeleteProduct(product._id)}
                       className="text-red-600 hover:text-red-900"
                     >
@@ -778,9 +1209,9 @@ export const ManageStore = ({
                   </td>
                 </tr>
               ))}
-              {filteredProducts.length === 0 && (
+              {sortedProducts.length === 0 && (
                 <tr>
-                  <td colSpan="5" className="px-6 py-4 text-center text-text-secondary">
+                  <td colSpan="5" className="px-4 sm:px-6 py-4 text-center text-text-secondary">
                     No products found
                   </td>
                 </tr>
@@ -790,25 +1221,39 @@ export const ManageStore = ({
         </div>
       )}
 
-      {activeTab === 'categories' && (
+      {activeTab === "categories" && (
         <div className="overflow-x-auto">
           <table className="min-w-full bg-background border border-border-primary rounded-lg">
             <thead className="bg-background-secondary">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Category</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Description</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Priority</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Actions</th>
+                <th 
+                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                  onClick={() => requestSort("name")}
+                >
+                  Category {getSortIcon("name")}
+                </th>
+                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                  Description
+                </th>
+                <th 
+                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                  onClick={() => requestSort("priority")}
+                >
+                  Priority {getSortIcon("priority")}
+                </th>
+                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-primary">
-              {filteredCategories.map((category) => (
+              {sortedCategories.map((category) => (
                 <tr key={category._id} className="hover:bg-background-hover transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="h-10 w-10 flex-shrink-0 relative rounded-md overflow-hidden">
-                        <Image 
-                          src={category.image?.url || "/images/placeholder.jpg"} 
+                        <Image
+                          src={category.image?.url || "/images/placeholder.jpg"}
                           alt={category.name}
                           fill
                           className="object-cover"
@@ -820,24 +1265,26 @@ export const ManageStore = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
-                    {category.description || 'No description'}
+                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-primary">
+                    {category.description || "No description"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      category.priority === 'main' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {category.priority || 'normal'}
+                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                    <span
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        category.priority === "main" ? "bg-purple-100 text-purple-800" : "bg-blue-100 text-blue-800"
+                      }`}
+                    >
+                      {category.priority || "normal"}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button 
+                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button
                       onClick={() => onEditCategory(category)}
                       className="text-indigo-600 hover:text-indigo-900 mr-3"
                     >
                       <FaEdit className="inline" /> Edit
                     </button>
-                    <button 
+                    <button
                       onClick={() => onDeleteCategory(category._id)}
                       className="text-red-600 hover:text-red-900"
                     >
@@ -846,9 +1293,9 @@ export const ManageStore = ({
                   </td>
                 </tr>
               ))}
-              {filteredCategories.length === 0 && (
+              {sortedCategories.length === 0 && (
                 <tr>
-                  <td colSpan="4" className="px-6 py-4 text-center text-text-secondary">
+                  <td colSpan="4" className="px-4 sm:px-6 py-4 text-center text-text-secondary">
                     No categories found
                   </td>
                 </tr>

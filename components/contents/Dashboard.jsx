@@ -14,7 +14,8 @@ import {
 import { 
   ManageStore, 
   UserManagement, 
-  OrderManagement 
+  OrderManagement,
+  ReviewManagement
 } from "@/components/contents/DashboardManagement";
 import { 
   ProductFormModal, 
@@ -31,6 +32,7 @@ import {
   useAllOrders
 } from "@/backend/lib/dashboardAction";
 import { toast } from "react-toastify";
+import { SettingsSection } from "./SettingsSection";
 
 export default function Dashboard({ session }) {
   const [state, setState] = useActiveSection();
@@ -196,13 +198,10 @@ export default function Dashboard({ session }) {
         return <UserManagement />;
       case "allOrders":
         return <OrderManagement />;
+      case "allReviews":
+        return <ReviewManagement />;
       case "settings":
-        return (
-          <div>
-            <h2 className="text-2xl font-bold mb-6">Account Settings</h2>
-            <p>Settings section is under development.</p>
-          </div>
-        );
+        return <SettingsSection session={session} />;
       default:
         return <OverviewSection session={session} setActiveSection={setActiveSection} />;
     }

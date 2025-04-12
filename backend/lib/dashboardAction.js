@@ -337,7 +337,6 @@ export const useAllOrders = (initialPage = 1, initialLimit = 10, status = 'all')
     }
   );
 
-  // Process the data to ensure proper image URLs
   const orders = data?.orders ? data.orders.map(order => ({
     ...order,
     items: order.items.map(item => ({
@@ -350,7 +349,6 @@ export const useAllOrders = (initialPage = 1, initialLimit = 10, status = 'all')
     } : null
   })) : [];
 
-  // Update pagination from response
   useEffect(() => {
     if (data) {
       setPagination({
@@ -373,42 +371,51 @@ export const useAllOrders = (initialPage = 1, initialLimit = 10, status = 'all')
     setPagination(prev => ({
       ...prev,
       limit: newLimit,
-      page: 1 // Reset to first page when changing limit
+      page: 1
     }));
   };
   
-  // Function to update order status
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
+      if (!orderId || !newStatus) {
+        throw new Error("Order ID and new status are required");
+      }
+      
       const response = await axios.put(`/api/admin/orders/${orderId}/status`, { 
         status: newStatus 
       });
       
-      // Update local state immediately
-      await mutate();
+      // Update cache optimistically without awaiting
+      mutate(
+        `/api/admin/orders?page=${pagination.page}&limit=${pagination.limit}&status=${status}`,
+        async (currentData) => {
+          if (!currentData?.orders) return currentData;
+          const updatedOrders = currentData.orders.map(order =>
+            order._id === orderId ? { ...order, status: newStatus } : order
+          );
+          return { ...currentData, orders: updatedOrders };
+        },
+        false // Don't revalidate immediately, rely on refetchOrders
+      );
       
       toast.success('Order status updated successfully!');
       return response.data;
     } catch (error) {
-      console.error('Error updating order status:', error);
-      //toast.error('Failed to update order status');
+      console.error('Error updating order status:', error.message || error);
+      toast.error(error.response?.data?.error || 'Failed to update order status');
       throw error;
     }
   };
   
-  // Function to delete an order
   const deleteOrder = async (orderId) => {
     try {
       await axios.delete(`/api/admin/orders/${orderId}`);
-      
-      // Update local state
-      mutate();
-      
+      mutate(); // Trigger revalidation
       toast.success('Order deleted successfully!');
       return true;
     } catch (error) {
       console.error('Error deleting order:', error);
-      toast.error('Failed to delete order');
+      toast.error(error.response?.data?.message || 'Failed to delete order');
       throw error;
     }
   };
