@@ -4,10 +4,10 @@ import dbConnect from "@/backend/lib/mongodb";
 
 export async function GET(request, { params }) {
   await dbConnect();
-  const { id } = params;
+  const { id } = params; // Extract ID from dynamic route params
 
   try {
-    const product = await Product.findById(id).lean();
+    const product = await Product.findById(id).lean(); // Convert Mongoose doc to plain object
     if (!product) {
       return new Response(JSON.stringify({ message: "Product not found" }), {
         status: 404,
@@ -15,17 +15,13 @@ export async function GET(request, { params }) {
       });
     }
 
+    // Ensure numeric fields are plain numbers, not MongoDB BSON objects
     const serializedProduct = {
-      _id: product._id,
-      id: product._id,
-      productId: product._id,
-      name: product.title || product.name || "Unknown Product",
-      price: Number(product.price) || 0,
-      quantity: Number(product.quantity) || 0,
-      image: product.images?.[0]?.url || product.image || "/images/placeholder.jpg",
-      variant: product.variants?.[0] || product.variant || {},
-      averageRating: Number(product.averageRating) || 0,
-      reviewCount: Number(product.reviewCount) || 0,
+      ...product,
+      price: Number(product.price),
+      quantity: Number(product.quantity),
+      averageRating: Number(product.averageRating),
+      reviewCount: Number(product.reviewCount),
       weight: product.weight ? Number(product.weight) : null,
       costPerItem: product.costPerItem ? Number(product.costPerItem) : null,
       compareAtPrice: product.compareAtPrice ? Number(product.compareAtPrice) : null,
@@ -37,7 +33,7 @@ export async function GET(request, { params }) {
     });
   } catch (error) {
     console.error("Error fetching product:", error);
-    return new Response(JSON.stringify({ message: "Server error", details: error.message }), {
+    return new Response(JSON.stringify({ message: "Server error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
