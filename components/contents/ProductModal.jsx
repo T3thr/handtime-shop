@@ -1,15 +1,17 @@
+
 "use client";
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
-import { X, ChevronLeft, Heart, ShoppingBag, ChevronRight, Star } from "lucide-react";
+import { X, ChevronLeft, Heart, ShoppingBag, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "@/context/CartContext";
 import { toast } from "react-toastify";
 import AuthContext from "@/context/AuthContext";
 import { useContext } from "react";
 import { useSidebar } from "@/context/SidebarContext";
-import { FaStar, FaRegStar, FaStarHalfAlt, FaUser, FaImage } from "react-icons/fa";
+import { FaStar, FaRegStar, FaStarHalfAlt, FaUser } from "react-icons/fa";
 import { useReviews } from "@/hooks/reviewHooks";
+import axios from "axios";
 
 export default function ProductModal({ product: initialProduct, onClose, keyword = "" }) {
   const { addToCart, cartItems, getCartSummary, fetchProductDetails, productCache } = useCart();
@@ -23,6 +25,7 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
   const { getProductReviews } = useReviews();
   const [ratingDistribution, setRatingDistribution] = useState([0, 0, 0, 0, 0]);
   const [loading, setLoading] = useState(true);
+  const [isInWishlist, setIsInWishlist] = useState(false);
 
   useEffect(() => {
     const loadProductDetails = async () => {
@@ -44,8 +47,20 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
       }
     };
 
+    const fetchWishlistStatus = async () => {
+      if (!isAuthenticated) return;
+      try {
+        const response = await axios.get("/api/wishlist");
+        const wishlist = response.data.wishlist.map((item) => item.productId.toString());
+        setIsInWishlist(wishlist.includes(initialProduct._id.toString()));
+      } catch (error) {
+        console.error("Failed to fetch wishlist status:", error);
+      }
+    };
+
     loadProductDetails();
-  }, [initialProduct._id, productCache, fetchProductDetails]);
+    fetchWishlistStatus();
+  }, [initialProduct._id, productCache, fetchProductDetails, isAuthenticated]);
 
   useEffect(() => {
     // If reviews aren't already loaded from Product.jsx
@@ -167,6 +182,24 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
       }
     } catch (error) {
       toast.error("Failed to add to cart");
+    }
+  };
+
+  const handleWishlist = async () => {
+    if (!isAuthenticated) {
+      toast.error("Please sign in to manage wishlist");
+      openSidebar();
+      onClose();
+      return;
+    }
+
+    try {
+      const response = await axios.post("/api/wishlist", { productId: product._id, action: "toggle" });
+      const isAdded = response.data.message === "Added to wishlist";
+      setIsInWishlist(isAdded);
+      toast.success(response.data.message);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to update wishlist");
     }
   };
 
@@ -309,7 +342,13 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
                 )}
               </div>
 
-              <div className="p-6 md:p-8 overflow-y-auto max-h-[80vh]">
+              <div
+                className={`p-6 md:p-8 ${
+                  activeTab === "reviews"
+                    ? "lg:overflow-y-auto lg:max-h-[70vh] scrollbar-thin scrollbar-thumb-primary scrollbar-track-background"
+                    : "lg:overflow-y-visible"
+                }`}
+              >
                 <div className="space-y-4">
                   <h1
                     className="text-2xl font-bold text-text-primary"
@@ -562,9 +601,18 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
                       <ShoppingBag className="w-5 h-5" />
                       {isInCart ? "Added to Cart" : "Add to Cart"}
                     </button>
-                    <button className="flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium border border-border-primary hover:bg-background-secondary">
-                      <Heart className="w-5 h-5" />
-                      <span className="hidden sm:inline">Add to Wishlist</span>
+                    <button
+                      onClick={handleWishlist}
+                      className={`flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium border border-border-primary hover:bg-background-secondary ${
+                        isInWishlist ? "text-error border-error" : "text-text-primary"
+                      }`}
+                    >
+                      <Heart
+                        className={`w-5 h-5 ${isInWishlist ? "fill-current" : ""}`}
+                      />
+                      <span className="hidden sm:inline">
+                        {isInWishlist ? "Remove from Wishlist" : "Add to Wishlist"}
+                      </span>
                     </button>
                   </div>
                 </div>
