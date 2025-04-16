@@ -177,7 +177,6 @@ export const useAllReviews = (page = 1, limit = 10, status = 'all') => {
 };
 
 export const submitReview = async (reviewData) => {
-  // Client-side validation
   if (!reviewData?.productId) {
     throw new Error('Product ID is missing');
   }
@@ -187,8 +186,6 @@ export const submitReview = async (reviewData) => {
   if (!reviewData?.rating || reviewData.rating < 1 || reviewData.rating > 5) {
     throw new Error('Rating must be between 1 and 5');
   }
-
-  console.log('Sending review to API:', reviewData);
 
   try {
     const response = await axios.post('/api/review', reviewData);
@@ -216,37 +213,76 @@ export const submitReview = async (reviewData) => {
 export const updateReview = async (reviewId, reviewData) => {
   try {
     const response = await axios.put(`/api/review/${reviewId}`, reviewData);
-    toast.success('Review updated successfully!');
     return response.data;
   } catch (error) {
     console.error('Error updating review:', error);
     const message = error.response?.data?.message || 'Failed to update review';
-    toast.error(message);
     throw new Error(message);
   }
 };
 
 export const deleteReview = async (reviewId) => {
+  const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(id);
+
+  if (!reviewId || !isValidObjectId(reviewId)) {
+    throw new Error('Invalid review ID');
+  }
+
   try {
     await axios.delete(`/api/review/${reviewId}`);
     toast.success('Review deleted successfully!');
     return true;
   } catch (error) {
     console.error('Error deleting review:', error);
-    const message = error.response?.data?.message || 'Failed to delete review';
+    const status = error.response?.status;
+    const serverError = error.response?.data?.error;
+    let message = 'Failed to delete review';
+
+    if (status === 401) {
+      message = 'Please log in to delete the review';
+    } else if (status === 403) {
+      message = 'You are not authorized to delete this review';
+    } else if (status === 404) {
+      message = 'Review not found';
+    } else if (status === 500) {
+      message = 'Server error, please try again later';
+    }
+
     toast.error(message);
     throw new Error(message);
   }
 };
 
 export const updateReviewStatus = async (reviewId, status) => {
+  const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(id);
+
+  if (!reviewId || !isValidObjectId(reviewId)) {
+    throw new Error('Invalid review ID');
+  }
+  if (!['pending', 'approved', 'rejected'].includes(status)) {
+    throw new Error('Invalid status');
+  }
+
   try {
     const response = await axios.put(`/api/admin/reviews/${reviewId}/status`, { status });
     toast.success('Review status updated successfully!');
     return response.data;
   } catch (error) {
     console.error('Error updating review status:', error);
-    const message = error.response?.data?.message || 'Failed to update review status';
+    const statusCode = error.response?.status;
+    const serverError = error.response?.data?.error;
+    let message = 'Failed to update review status';
+
+    if (statusCode === 401) {
+      message = 'Please log in to update review status';
+    } else if (statusCode === 403) {
+      message = 'You are not authorized to update review status';
+    } else if (statusCode === 404) {
+      message = 'Review not found';
+    } else if (statusCode === 500) {
+      message = 'Server error, please try again later';
+    }
+
     toast.error(message);
     throw new Error(message);
   }

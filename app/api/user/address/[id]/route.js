@@ -1,103 +1,126 @@
-"use client";
 import { NextResponse } from "next/server";
-import { connectToDB } from "@/lib/mongoose";
-import User from "@/models/User";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import dbConnect from "@/backend/lib/mongodb";
+import User from "@/backend/models/User";
+import { getServerSession } from "next-auth/next";
+import { options } from "@/app/api/auth/[...nextauth]/options";
 import mongoose from "mongoose";
 
 // PUT /api/user/address/[id] - Update an address
-export async function PUT(req, { params }) {
+export async function PUT(request, { params }) {
+  const session = await getServerSession(options);
+  if (!session || !session.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
-    await connectToDB();
-    
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-    
+    await dbConnect();
     const addressId = params.id;
-    if (!mongoose.Types.ObjectId.isValid(addressId)) {
-      return NextResponse.json({ message: "Invalid address ID" }, { status: 400 });
-    }
-    
-    const user = await User.findById(session.user.id);
-    if (!user) {
-      return NextResponse.json({ message: "User not found" }, { status: 404 });
-    }
-    
-    const addressIndex = user.addresses.findIndex(addr => addr._id.toString() === addressId);
-    if (addressIndex === -1) {
-      return NextResponse.json({ message: "Address not found" }, { status: 404 });
-    }
-    
-    const addressData = await req.json();
+    const data = await request.json();
     
     // Validate required fields
     const requiredFields = ['recipientName', 'street', 'city', 'postalCode', 'country'];
-    for (const field of requiredFields) {
-      if (!addressData[field]) {
-        return NextResponse.json({ message: `${field} is required` }, { status: 400 });
-      }
+    const missingFields = requiredFields.filter(field => !data[field]);
+    
+    if (missingFields.length > 0) {
+      return NextResponse.json({ 
+        error: `Missing required fields: ${missingFields.join(', ')}` 
+      }, { status: 400 });
     }
     
-    // If making this address default, remove default from other addresses
-    if (addressData.isDefault && !user.addresses[addressIndex].isDefault) {
-      user.addresses.forEach(addr => {
-        addr.isDefault = false;
-      });
-    }
-    
-    // Update the address
-    Object.keys(addressData).forEach(key => {
-      user.addresses[addressIndex][key] = addressData[key];
+    // Find user and address
+    const user = await User.findOne({ 
+      $or: [
+        { email: session.user.email }, 
+        { lineId: session.user.lineId }
+      ],
+      "addresses._id": addressId
     });
+    
+    if (!user) {
+      return NextResponse.json({ error: "User or address not found" }, { status: 404 });
+    }
+    
+    // Find the address in the user's addresses array
+    const addressIndex = user.addresses.findIndex(addr => addr._id.toString() === addressId);
+    if (addressIndex === -1) {
+      return NextResponse.json({ error: "Address not found" }, { status: 404 });
+    }
+    
+    // Update address fields
+    user.addresses[addressIndex].recipientName = data.recipientName;
+    user.addresses[addressIndex].street = data.street;
+    user.addresses[addressIndex].city = data.city;
+    user.addresses[addressIndex].state = data.state || "";
+    user.addresses[addressIndex].postalCode = data.postalCode;
+    user.addresses[addressIndex].country = data.country;
+    user.addresses[addressIndex].phone = data.phone || "";
+    user.addresses[addressIndex].type = data.type || "home";
+    
+    // Handle default address setting
+    if (data.isDefault && !user.addresses[addressIndex].isDefault) {
+      // Unset any existing default
+      user.addresses.forEach((addr, idx) => {
+        if (idx !== addressIndex) {
+          addr.isDefault = false;
+        }
+      });
+      user.addresses[addressIndex].isDefault = true;
+    }
     
     await user.save();
     
     return NextResponse.json({ 
       message: "Address updated successfully", 
-      address: user.addresses[addressIndex]
+      address: user.addresses[addressIndex] 
     });
   } catch (error) {
-    console.error("Error updating address:", error);
-    return NextResponse.json({ message: "Failed to update address" }, { status: 500 });
+    console.error("Failed to update address:", error);
+    return NextResponse.json({ 
+      error: "Failed to update address", 
+      details: error.message 
+    }, { status: 500 });
   }
 }
 
 // DELETE /api/user/address/[id] - Delete an address
-export async function DELETE(req, { params }) {
+export async function DELETE(request, { params }) {
+  const session = await getServerSession(options);
+  if (!session || !session.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
-    await connectToDB();
-    
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-    
+    await dbConnect();
     const addressId = params.id;
-    if (!mongoose.Types.ObjectId.isValid(addressId)) {
-      return NextResponse.json({ message: "Invalid address ID" }, { status: 400 });
-    }
     
-    const user = await User.findById(session.user.id);
+    // Find user and address
+    const user = await User.findOne({ 
+      $or: [
+        { email: session.user.email }, 
+        { lineId: session.user.lineId }
+      ],
+      "addresses._id": addressId
+    });
+    
     if (!user) {
-      return NextResponse.json({ message: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "User or address not found" }, { status: 404 });
     }
     
+    // Find the address in the user's addresses array
     const addressIndex = user.addresses.findIndex(addr => addr._id.toString() === addressId);
     if (addressIndex === -1) {
-      return NextResponse.json({ message: "Address not found" }, { status: 404 });
+      return NextResponse.json({ error: "Address not found" }, { status: 404 });
     }
     
-    const wasDefault = user.addresses[addressIndex].isDefault;
+    // Check if this is the default address
+    const isDefault = user.addresses[addressIndex].isDefault;
     
     // Remove the address
     user.addresses.splice(addressIndex, 1);
     
     // If the deleted address was the default and there are other addresses,
-    // make the first one the default
-    if (wasDefault && user.addresses.length > 0) {
+    // set the first remaining address as default
+    if (isDefault && user.addresses.length > 0) {
       user.addresses[0].isDefault = true;
     }
     
@@ -105,7 +128,10 @@ export async function DELETE(req, { params }) {
     
     return NextResponse.json({ message: "Address deleted successfully" });
   } catch (error) {
-    console.error("Error deleting address:", error);
-    return NextResponse.json({ message: "Failed to delete address" }, { status: 500 });
+    console.error("Failed to delete address:", error);
+    return NextResponse.json({ 
+      error: "Failed to delete address", 
+      details: error.message 
+    }, { status: 500 });
   }
 }

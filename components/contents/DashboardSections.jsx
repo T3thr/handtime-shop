@@ -1,6 +1,9 @@
 "use client";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useUserData, useOrders, useWishlist } from "@/hooks/dashboardHooks";
+import { useUserReviews } from "@/hooks/reviewHooks";
+import { useCart } from "@/context/CartContext";
+import ProductModal from "./ProductModal";
 import {
   DashboardCard,
   SectionHeader,
@@ -12,13 +15,14 @@ import {
   Badge,
   Pagination,
 } from "@/components/contents/DashboardUI";
-import { FaShoppingBag, FaHeart, FaBox, FaTrash, FaShoppingCart, FaInfoCircle, FaSortUp, FaSortDown, FaStar } from "react-icons/fa";
+import { FaShoppingBag, FaHeart, FaBox, FaTrash, FaShoppingCart, FaInfoCircle, FaSortUp, FaSortDown, FaStar, FaBell } from "react-icons/fa";
+import { Heart, ShoppingBag, Filter, Search, X, ChevronRight, ArrowUpRight, Star, Sparkles } from "lucide-react";
 import { MdLocalShipping } from "react-icons/md";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { toast } from "react-toastify";
-import ReviewModal from "./ReviewModal.jsx"; // Explicit .jsx extension
+import ReviewModal from "./ReviewModal";
 
 // Order Info Modal Component
 const OrderInfoModal = ({ isOpen, onClose, order }) => {
@@ -384,7 +388,7 @@ export const OverviewSection = ({ session, setActiveSection }) => {
             onClick={() => handleOpenInfoModal(row)}
             className="text-xs text-primary hover:text-primary-dark mt-1 flex items-center"
           >
-            <FaInfoCircle className="mr-1" /> View Details
+            <FaInfoCircle className="mr-1" /> Details
           </button>
         </div>
       ),
@@ -392,8 +396,7 @@ export const OverviewSection = ({ session, setActiveSection }) => {
     {
       header: "Total",
       accessor: "totalAmount",
-      align: "right",
-      render: (row) => <span className="font-medium">฿{row.totalAmount.toFixed(2)}</span>,
+      render: (row) => `฿${row.totalAmount.toFixed(2)}`,
       sortable: true,
       onClick: () => requestSort("totalAmount"),
       headerContent: () => (
@@ -404,45 +407,122 @@ export const OverviewSection = ({ session, setActiveSection }) => {
 
   return (
     <>
-      <SectionHeader
-        title="Dashboard Overview"
-        subtitle={`Welcome, ${session.user.name.split(" ")[0]}!`}
-      />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {stats.map((stat, index) => (
-          <DashboardCard key={index} {...stat} />
-        ))}
-      </div>
-      <Card className="mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium text-text-primary">Recent Orders</h3>
-          <button
-            onClick={() => setActiveSection("orders")}
-            className="text-sm text-primary hover:underline flex items-center"
-          >
-            View all orders
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4 ml-1"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </button>
-        </div>
-        <DataTable
-          columns={orderColumns}
-          data={sortedOrders?.slice(0, 2) || []}
-          emptyMessage="No orders found."
+      <div className="space-y-6">
+        <SectionHeader
+          title="Dashboard Overview"
+          description="Welcome back! Here's a summary of your recent activity."
         />
-      </Card>
 
-      {/* Order Info Modal */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((stat, index) => (
+            <DashboardCard
+              key={index}
+              icon={stat.icon}
+              title={stat.title}
+              value={stat.value}
+              color={stat.color}
+            />
+          ))}
+        </div>
+
+        <Card>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
+            <h3 className="text-lg font-bold mb-2 sm:mb-0">Recent Orders</h3>
+            <button
+              onClick={() => setActiveSection("orders")}
+              className="text-sm text-primary hover:text-primary-dark flex items-center"
+            >
+              View All <ChevronRight className="w-4 h-4 ml-1" />
+            </button>
+          </div>
+
+          {orders && orders.length > 0 ? (
+            <DataTable
+              columns={orderColumns}
+              data={sortedOrders.slice(0, 5)}
+              keyField="_id"
+              emptyMessage="No orders found"
+            />
+          ) : (
+            <EmptyState
+              icon={FaShoppingBag}
+              title="No Orders Yet"
+              description="Your order history will appear here once you make a purchase."
+              action={{
+                label: "Start Shopping",
+                onClick: () => router.push("/"),
+              }}
+            />
+          )}
+        </Card>
+
+        <Card>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
+            <h3 className="text-lg font-bold mb-2 sm:mb-0">Wishlist</h3>
+            <button
+              onClick={() => setActiveSection("wishlist")}
+              className="text-sm text-primary hover:text-primary-dark flex items-center"
+            >
+              View All <ChevronRight className="w-4 h-4 ml-1" />
+            </button>
+          </div>
+
+          {wishlist && wishlist.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {wishlist.slice(0, 3).map((item) => (
+                <div
+                  key={item._id}
+                  className="border border-border-primary rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+                >
+                  <div className="relative h-40">
+                    <Image
+                      src={item.productId.images?.[0]?.url || "/images/placeholder.jpg"}
+                      alt={item.productId.name}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <h4 className="font-medium text-text-primary mb-1 line-clamp-1">
+                      {item.productId.name}
+                    </h4>
+                    <p className="text-primary font-bold">฿{item.productId.price.toFixed(2)}</p>
+                    <div className="flex mt-2 space-x-2">
+                      <button
+                        onClick={() => {
+                          // Add to cart logic
+                        }}
+                        className="flex-1 px-3 py-1.5 bg-primary text-text-inverted rounded-md text-sm hover:bg-primary-hover flex items-center justify-center"
+                      >
+                        <FaShoppingCart className="mr-1" /> Add to Cart
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Remove from wishlist logic
+                        }}
+                        className="px-3 py-1.5 border border-border-primary rounded-md text-sm hover:bg-background-secondary"
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={FaHeart}
+              title="Your Wishlist is Empty"
+              description="Save items you like for future reference."
+              action={{
+                label: "Explore Products",
+                onClick: () => router.push("/"),
+              }}
+            />
+          )}
+        </Card>
+      </div>
+
       <OrderInfoModal
         isOpen={isInfoModalOpen}
         onClose={() => setIsInfoModalOpen(false)}
@@ -453,7 +533,7 @@ export const OverviewSection = ({ session, setActiveSection }) => {
 };
 
 export const OrdersSection = ({ session }) => {
-  const { orders, isLoading, isError, pagination, changePage } = useOrders();
+  const { orders, isLoading, isError, pagination, changePage, refetch: refetchOrders } = useOrders();
   const router = useRouter();
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
@@ -461,6 +541,32 @@ export const OrdersSection = ({ session }) => {
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+
+  // Check if order has items that need reviews
+  const orderNeedsReviews = (order) => {
+    if (order.status !== "delivered") return false;
+    return order.items.some(item => !item.reviewStatus);
+  };
+
+  // Count items that need reviews in an order
+  const countItemsNeedingReview = (order) => {
+    if (order.status !== "delivered") return 0;
+    return order.items.filter(item => !item.reviewStatus).length;
+  };
+
+  // Check if any orders need reviews
+  const hasOrdersNeedingReviews = useMemo(() => {
+    if (!orders || orders.length === 0) return false;
+    return orders.some(orderNeedsReviews);
+  }, [orders]);
+
+  // Count total items needing reviews
+  const totalItemsNeedingReviews = useMemo(() => {
+    if (!orders || orders.length === 0) return 0;
+    return orders.reduce((total, order) => {
+      return total + countItemsNeedingReview(order);
+    }, 0);
+  }, [orders]);
 
   const requestSort = (key) => {
     let direction = 'ascending';
@@ -511,12 +617,42 @@ export const OrdersSection = ({ session }) => {
   }, [orders, sortConfig]);
 
   const handleReviewClick = (product, orderId) => {
-    // Normalize product to ensure _id
+    console.log("Review click with product:", product, "orderId:", orderId);
+    
+    // Enhanced validation to handle all possible product data structures
+    if (!product) {
+      toast.error("Cannot open review form: Product information is missing");
+      return;
+    }
+    
+    if (!orderId) {
+      toast.error("Cannot open review form: Order information is missing");
+      return;
+    }
+    
+    // Normalize the product object structure to ensure consistency
+    // This handles all possible formats of product data
     const normalizedProduct = {
-      _id: product.productId,
-      name: product.name,
-      images: product.image ? [{ url: product.image }] : [],
+      _id: product._id || 
+           (typeof product.productId === 'object' ? product.productId._id : product.productId) ||
+           (typeof product.product === 'object' ? product.product._id : product.product),
+      name: product.name || 
+            (typeof product.productId === 'object' ? product.productId.name : null) ||
+            (typeof product.product === 'object' ? product.product.name : null) ||
+            "Unknown Product",
+      images: product.images || 
+              (typeof product.productId === 'object' && product.productId.images ? product.productId.images : null) ||
+              (typeof product.product === 'object' && product.product.images ? product.product.images : null) ||
+              (product.image ? [{ url: product.image }] : [{ url: "/images/placeholder.jpg" }]),
     };
+    
+    console.log("Normalized product:", normalizedProduct);
+    
+    if (!normalizedProduct._id) {
+      toast.error("Cannot open review form: Invalid product ID");
+      return;
+    }
+  
     setSelectedProduct(normalizedProduct);
     setSelectedOrderId(orderId);
     setReviewModalOpen(true);
@@ -528,7 +664,7 @@ export const OrdersSection = ({ session }) => {
   };
 
   // Listen for events from the OrderInfoModal
-  React.useEffect(() => {
+  useEffect(() => {
     const handleOpenReviewModal = (e) => {
       const { product, orderId } = e.detail;
       handleReviewClick(product, orderId);
@@ -564,7 +700,16 @@ export const OrdersSection = ({ session }) => {
     { 
       header: "Status", 
       accessor: "status", 
-      render: (row) => <OrderStatus status={row.status} />,
+      render: (row) => (
+        <div className="flex items-center">
+          <OrderStatus status={row.status} />
+          {row.status === "delivered" && orderNeedsReviews(row) && (
+            <span className="ml-2 text-amber-500">
+              <FaStar className="inline-block" title="Reviews needed" />
+            </span>
+          )}
+        </div>
+      ),
       sortable: true,
       onClick: () => requestSort("status"),
       headerContent: () => (
@@ -611,21 +756,47 @@ export const OrdersSection = ({ session }) => {
             onClick={() => handleOpenInfoModal(row)}
             className="text-xs text-primary hover:text-primary-dark mt-1 flex items-center"
           >
-            <FaInfoCircle className="mr-1" /> View Details
+            <FaInfoCircle className="mr-1" /> Details
           </button>
+          {row.status === "delivered" && orderNeedsReviews(row) && (
+            <div className="text-xs text-amber-500 mt-1">
+              {countItemsNeedingReview(row)} item(s) need review
+            </div>
+          )}
         </div>
       ),
     },
     {
       header: "Total",
       accessor: "totalAmount",
-      align: "right",
-      render: (row) => <span className="font-medium">฿{row.totalAmount.toFixed(2)}</span>,
+      render: (row) => `฿${row.totalAmount.toFixed(2)}`,
       sortable: true,
       onClick: () => requestSort("totalAmount"),
       headerContent: () => (
         <>Total {getSortIcon("totalAmount")}</>
       )
+    },
+    {
+      header: "Actions",
+      accessor: "actions",
+      render: (row) => (
+        <div className="flex space-x-2">
+          <button
+            onClick={() => handleOpenInfoModal(row)}
+            className="px-3 py-1 bg-background-secondary text-text-primary text-sm rounded-md hover:bg-background-hover transition-colors"
+          >
+            View
+          </button>
+          {row.status === "delivered" && orderNeedsReviews(row) && (
+            <button
+              onClick={() => handleOpenInfoModal(row)}
+              className="px-3 py-1 bg-amber-500 text-white text-sm rounded-md hover:bg-amber-600 transition-colors flex items-center"
+            >
+              <FaStar className="mr-1" /> Review
+            </button>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -637,7 +808,7 @@ export const OrdersSection = ({ session }) => {
     return (
       <div className="text-center py-8">
         <p className="text-error mb-4">Failed to load orders</p>
-        <button 
+        <button
           onClick={() => window.location.reload()}
           className="px-4 py-2 bg-primary text-text-inverted rounded-lg hover:bg-primary-dark transition-colors duration-300"
         >
@@ -649,39 +820,67 @@ export const OrdersSection = ({ session }) => {
 
   return (
     <>
-      <SectionHeader title="Your Orders" />
-      <Card>
-        {orders?.length > 0 ? (
-          <>
-            <DataTable columns={orderColumns} data={sortedOrders} emptyMessage="No orders found." />
-            <Pagination
-              currentPage={pagination.page}
-              totalPages={pagination.totalPages}
-              onPageChange={changePage}
-            />
-          </>
-        ) : (
-          <EmptyState
-            icon={FaShoppingBag}
-            title="No Orders Yet"
-            description="Your order history will appear here once you make a purchase."
-            actionText="Browse Products"
-            onAction={() => router.push("/")}
-          />
-        )}
-      </Card>
-
-      {/* Review Modal */}
-      {reviewModalOpen && selectedProduct && (
-        <ReviewModal
-          isOpen={reviewModalOpen}
-          onClose={() => setReviewModalOpen(false)}
-          product={selectedProduct}
-          orderId={selectedOrderId}
+      <div className="space-y-6">
+        <SectionHeader
+          title="My Orders"
+          description="Track and manage your orders"
         />
-      )}
 
-      {/* Order Info Modal */}
+        {hasOrdersNeedingReviews && (
+          <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-md mb-4 dark:bg-amber-900/20 dark:border-amber-600">
+            <div className="flex items-center">
+              <FaBell className="text-amber-500 mr-3" />
+              <div>
+                <h3 className="font-medium text-amber-800 dark:text-amber-400">Reviews Needed</h3>
+                <p className="text-amber-700 dark:text-amber-300 text-sm">
+                  You have {totalItemsNeedingReviews} item{totalItemsNeedingReviews !== 1 ? 's' : ''} from delivered orders that {totalItemsNeedingReviews !== 1 ? 'need' : 'needs'} your review.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <Card>
+          {orders && orders.length > 0 ? (
+            <>
+              <DataTable
+                columns={orderColumns}
+                data={sortedOrders}
+                keyField="_id"
+                emptyMessage="No orders found"
+              />
+              <div className="mt-4 flex justify-between items-center">
+                <div className="text-sm text-text-secondary">
+                  Showing {pagination.page} of {pagination.totalPages} pages
+                </div>
+                <Pagination
+                  currentPage={pagination.page}
+                  totalPages={pagination.totalPages}
+                  onPageChange={changePage}
+                />
+              </div>
+            </>
+          ) : (
+            <EmptyState
+              icon={FaShoppingBag}
+              title="No Orders Yet"
+              description="Your order history will appear here once you make a purchase."
+              action={{
+                label: "Start Shopping",
+                onClick: () => router.push("/"),
+              }}
+            />
+          )}
+        </Card>
+      </div>
+
+      <ReviewModal
+        isOpen={reviewModalOpen}
+        onClose={() => setReviewModalOpen(false)}
+        product={selectedProduct}
+        orderId={selectedOrderId}
+      />
+
       <OrderInfoModal
         isOpen={isInfoModalOpen}
         onClose={() => setIsInfoModalOpen(false)}
@@ -691,84 +890,53 @@ export const OrdersSection = ({ session }) => {
   );
 };
 
-export const WishlistSection = ({ session, onRemoveFromWishlist, onAddToCart }) => {
+export const WishlistSection = ({ session, onAddToCart }) => {
   const { wishlist, isLoading, isError, pagination, changePage, toggleWishlistItem } = useWishlist();
   const router = useRouter();
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const { cartItems } = useCart(); // Use CartContext to check cart status
 
-  const requestSort = (key) => {
-    let direction = 'ascending';
-    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
-      direction = 'descending';
-    } else if (sortConfig.key === key && sortConfig.direction === 'descending') {
-      direction = null;
-    }
-    setSortConfig({ key, direction });
+  // Animation variants from Product.jsx
+  const staggerContainer = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+      },
+    },
   };
 
-  const getSortIcon = (key) => {
-    if (sortConfig.key !== key) {
-      return null;
-    }
-    return sortConfig.direction === 'ascending' ? <FaSortUp className="inline ml-1" /> : <FaSortDown className="inline ml-1" />;
+  const fadeInUp = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 },
   };
-
-  const sortedWishlist = useMemo(() => {
-    let sortableWishlist = [...(wishlist || [])];
-    if (sortConfig.key && sortConfig.direction) {
-      sortableWishlist.sort((a, b) => {
-        if (sortConfig.key === 'createdAt') {
-          const dateA = new Date(a.createdAt);
-          const dateB = new Date(b.createdAt);
-          
-          if (sortConfig.direction === 'ascending') {
-            return dateA - dateB;
-          }
-          return dateB - dateA;
-        } else if (sortConfig.key === 'price') {
-          const priceA = a.productId?.price || 0;
-          const priceB = b.productId?.price || 0;
-          
-          if (sortConfig.direction === 'ascending') {
-            return priceA - priceB;
-          }
-          return priceB - priceA;
-        } else {
-          const valueA = a.productId?.[sortConfig.key] || '';
-          const valueB = b.productId?.[sortConfig.key] || '';
-          
-          if (valueA < valueB) {
-            return sortConfig.direction === 'ascending' ? -1 : 1;
-          }
-          if (valueA > valueB) {
-            return sortConfig.direction === 'ascending' ? 1 : -1;
-          }
-          return 0;
-        }
-      });
-    }
-    return sortableWishlist;
-  }, [wishlist, sortConfig]);
 
   const handleRemoveFromWishlist = async (productId) => {
     try {
       await toggleWishlistItem(productId);
-      toast.success("Item removed from wishlist");
     } catch (error) {
       toast.error("Failed to remove from wishlist");
     }
   };
 
   const handleAddToCart = async (product) => {
+    if (!product._id) {
+      console.error("Invalid product _id:", product);
+      toast.error("Cannot add to cart: Invalid product");
+      return;
+    }
+
     try {
       const cartItem = {
         id: product._id,
+        productId: product._id, // Match cartItems key
         name: product.name,
         price: product.price,
         image: product.images[0]?.url || "/images/placeholder.jpg",
-        category: product.categories[0] || "",
+        category: product.categories[0]?.name || product.categories[0] || "",
       };
-
+      console.log("Adding to cart:", cartItem);
       await onAddToCart(cartItem);
       toast.success(
         <div className="flex items-center gap-2">
@@ -787,114 +955,28 @@ export const WishlistSection = ({ session, onRemoveFromWishlist, onAddToCart }) 
         </div>
       );
     } catch (error) {
+      console.error("Error adding to cart:", error);
       toast.error("Failed to add to cart");
     }
   };
 
-  const wishlistColumns = [
-    {
-      header: "Product",
-      accessor: "productId",
-      render: (row) => (
-        <div className="flex items-center">
-          <div className="h-10 w-10 flex-shrink-0 relative rounded-md overflow-hidden">
-            <Image
-              src={row.productId?.images?.[0]?.url || "/images/placeholder.jpg"}
-              alt={row.productId?.name || "Product"}
-              fill
-              className="object-cover"
-            />
-          </div>
-          <div className="ml-4">
-            <div className="text-sm font-medium text-text-primary">{row.productId?.name || "Product"}</div>
-            <div className="text-xs text-text-secondary">
-              {row.productId?.categories?.map((cat) => cat.name || cat).join(", ") || "Uncategorized"}
-            </div>
-          </div>
-        </div>
-      ),
-      sortable: true,
-      onClick: () => requestSort("name"),
-      headerContent: () => (
-        <>Product {getSortIcon("name")}</>
-      )
-    },
-    {
-      header: "Price",
-      accessor: "price",
-      render: (row) => (
-        <span className="font-medium text-primary">
-          ฿{row.productId?.price?.toFixed(2) || "0.00"}
-        </span>
-      ),
-      sortable: true,
-      onClick: () => requestSort("price"),
-      headerContent: () => (
-        <>Price {getSortIcon("price")}</>
-      )
-    },
-    {
-      header: "Status",
-      accessor: "status",
-      render: (row) => (
-        <Badge
-          color={
-            row.productId?.quantity > 0 || row.productId?.continueSellingWhenOutOfStock
-              ? "success"
-              : "error"
-          }
-        >
-          {row.productId?.quantity > 0 || row.productId?.continueSellingWhenOutOfStock
-            ? "In Stock"
-            : "Out of Stock"}
-        </Badge>
-      ),
-      sortable: true,
-      onClick: () => requestSort("quantity"),
-      headerContent: () => (
-        <>Status {getSortIcon("quantity")}</>
-      )
-    },
-    {
-      header: "Added On",
-      accessor: "createdAt",
-      render: (row) => new Date(row.createdAt).toLocaleDateString(),
-      sortable: true,
-      onClick: () => requestSort("createdAt"),
-      headerContent: () => (
-        <>Added On {getSortIcon("createdAt")}</>
-      )
-    },
-    {
-      header: "Actions",
-      accessor: "actions",
-      render: (row) => (
-        <div className="flex space-x-2">
-          <button
-            onClick={() => handleAddToCart(row.productId)}
-            disabled={
-              row.productId?.quantity <= 0 && !row.productId?.continueSellingWhenOutOfStock
-            }
-            className={`p-2 rounded-md ${
-              row.productId?.quantity <= 0 && !row.productId?.continueSellingWhenOutOfStock
-                ? "bg-background-secondary text-text-muted cursor-not-allowed"
-                : "bg-primary text-text-inverted hover:bg-primary-dark"
-            }`}
-            title="Add to Cart"
-          >
-            <FaShoppingCart size={14} />
-          </button>
-          <button
-            onClick={() => handleRemoveFromWishlist(row.productId?._id)}
-            className="p-2 rounded-md bg-error text-text-inverted hover:bg-error-dark"
-            title="Remove from Wishlist"
-          >
-            <FaTrash size={14} />
-          </button>
-        </div>
-      ),
-    },
-  ];
+  const handleProductClick = (product) => {
+    if (!product._id) {
+      console.error("Invalid product _id for modal:", product);
+      toast.error("Cannot view product: Invalid product");
+      return;
+    }
+    setSelectedProduct(product);
+  };
+
+  const isProductInCart = (productId) => {
+    return cartItems.some((item) => item.productId === productId || item.id === productId);
+  };
+
+  const getProductQuantityInCart = (productId) => {
+    const item = cartItems.find((item) => item.productId === productId || item.id === productId);
+    return item ? item.quantity : 0;
+  };
 
   if (isLoading) {
     return <LoadingSpinner />;
@@ -920,11 +1002,121 @@ export const WishlistSection = ({ session, onRemoveFromWishlist, onAddToCart }) 
       <Card>
         {wishlist?.length > 0 ? (
           <>
-            <DataTable
-              columns={wishlistColumns}
-              data={sortedWishlist}
-              emptyMessage="Your wishlist is empty."
-            />
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 p-4"
+            >
+              {wishlist.map((item, index) => {
+                const product = item; // Use item directly as it contains all product data
+                if (!product._id) {
+                  console.warn("Skipping product with missing _id:", product);
+                  return null;
+                }
+                return (
+                  <motion.div
+                    key={product._id}
+                    id={`wishlist-product-${product._id}`}
+                    variants={fadeInUp}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                    whileHover={{ y: -5 }}
+                    className="group relative bg-surface-card rounded-xl shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md"
+                  >
+                    <div
+                      className="aspect-square relative overflow-hidden cursor-pointer"
+                      onClick={() => handleProductClick(product)}
+                    >
+                      <Image
+                        src={product.images[0]?.url || "/images/placeholder.jpg"}
+                        alt={product.name}
+                        fill
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <div className="absolute top-3 right-3">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveFromWishlist(product._id);
+                          }}
+                          className="p-2 rounded-full bg-surface-card opacity-90 backdrop-blur-sm hover:bg-surface-card transition-colors duration-200"
+                        >
+                          <Heart
+                            className="w-5 h-5 text-error"
+                            fill="currentColor"
+                          />
+                        </button>
+                      </div>
+                      {product.quantity <= 0 && !product.continueSellingWhenOutOfStock && (
+                        <div className="absolute top-0 left-0 w-full bg-error/90 text-text-inverted text-center py-1 text-sm font-medium">
+                          Out of Stock
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-5">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3
+                          className="font-medium text-text-primary line-clamp-1 cursor-pointer"
+                          onClick={() => handleProductClick(product)}
+                        >
+                          {product.name}
+                        </h3>
+                        <span className="font-bold text-primary">฿{product.price.toFixed(2)}</span>
+                      </div>
+                      <p className="text-sm text-text-muted line-clamp-2 mb-2 min-h-[40px]">
+                        {product.shortDescription || product.description}
+                      </p>
+                      <div className="flex items-center mb-4">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-4 h-4 ${
+                              i < Math.round(product.averageRating || 0)
+                                ? "text-warning fill-current"
+                                : "text-text-muted"
+                            }`}
+                          />
+                        ))}
+                        <span className="ml-2 text-xs text-text-secondary">
+                          ({product.averageRating?.toFixed(1) || "0"})
+                        </span>
+                      </div>
+
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handleAddToCart(product)}
+                        disabled={product.quantity <= 0 && !product.continueSellingWhenOutOfStock}
+                        className={`w-full flex items-center justify-center px-4 py-2 rounded-full transition-colors duration-200 ${
+                          isProductInCart(product._id)
+                            ? "bg-primary-dark text-text-inverted"
+                            : product.quantity <= 0 && !product.continueSellingWhenOutOfStock
+                            ? "bg-background-secondary text-text-muted cursor-not-allowed"
+                            : "bg-primary text-text-inverted hover:bg-primary-dark"
+                        }`}
+                      >
+                        {isProductInCart(product._id) ? (
+                          <>
+                            <ShoppingBag className="w-4 h-4" />
+                            <span className="text-xs mr-1">{getProductQuantityInCart(product._id)}</span>
+                            <span className="text-sm">In Cart</span>
+                          </>
+                        ) : (
+                          <>
+                            <ShoppingBag className="w-4 h-4 mr-1" />
+                            <span className="text-sm">Add To Cart</span>
+                          </>
+                        )}
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+
             <Pagination
               currentPage={pagination.page}
               totalPages={pagination.totalPages}
@@ -941,14 +1133,29 @@ export const WishlistSection = ({ session, onRemoveFromWishlist, onAddToCart }) 
           />
         )}
       </Card>
+
+      {selectedProduct && (
+        <ProductModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          keyword={selectedProduct.name}
+        />
+      )}
     </>
   );
 };
 
 export const ReviewsSection = ({ session }) => {
-  const { reviews, isLoading, isError, pagination, changePage } = useUserReviews(); 
+  const { reviews, isLoading, isError, pagination, changePage } = useUserReviews();
   const router = useRouter();
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+  const [editReviewModalOpen, setEditReviewModalOpen] = useState(false);
+  const [selectedReview, setSelectedReview] = useState(null);
+
+  // Validate ObjectId format
+  const isValidObjectId = (id) => {
+    return /^[0-9a-fA-F]{24}$/.test(id);
+  };
 
   const requestSort = (key) => {
     let direction = 'ascending';
@@ -984,6 +1191,13 @@ export const ReviewsSection = ({ session }) => {
             return a.rating - b.rating;
           }
           return b.rating - a.rating;
+        } else if (sortConfig.key === 'productId.name') {
+          const nameA = a.productId?.name || '';
+          const nameB = b.productId?.name || '';
+          if (sortConfig.direction === 'ascending') {
+            return nameA.localeCompare(nameB);
+          }
+          return nameB.localeCompare(nameA);
         } else {
           if (a[sortConfig.key] < b[sortConfig.key]) {
             return sortConfig.direction === 'ascending' ? -1 : 1;
@@ -997,6 +1211,28 @@ export const ReviewsSection = ({ session }) => {
     }
     return sortableReviews;
   }, [reviews, sortConfig]);
+
+  const handleEditReview = (review) => {
+    if (!review?.productId?._id || !review?._id) {
+      toast.error("Cannot edit review: Invalid product or review information");
+      return;
+    }
+
+    setSelectedReview({
+      _id: review.productId._id,
+      name: review.productId.name || "Unknown Product",
+      images: review.productId.images?.length > 0 
+        ? review.productId.images 
+        : [{ url: "/images/placeholder.jpg" }],
+      reviewId: review._id,
+      orderId: review.orderId,
+      initialRating: review.rating,
+      initialTitle: review.title,
+      initialComment: review.comment,
+      initialImages: review.images || [],
+    });
+    setEditReviewModalOpen(true);
+  };
 
   const reviewColumns = [
     {
@@ -1013,7 +1249,7 @@ export const ReviewsSection = ({ session }) => {
             />
           </div>
           <div className="ml-4">
-            <div className="text-sm font-medium text-text-primary">{row.productId?.name || "Product"}</div>
+            <div className="text-sm font-medium text-text-primary">{row.productId?.name || "Unknown Product"}</div>
           </div>
         </div>
       ),
@@ -1099,6 +1335,19 @@ export const ReviewsSection = ({ session }) => {
         <>Date {getSortIcon("createdAt")}</>
       )
     },
+    {
+      header: "Actions",
+      accessor: "actions",
+      render: (row) => (
+        <button
+          onClick={() => handleEditReview(row)}
+          className="text-primary hover:text-primary-dark text-sm"
+          disabled={row.status !== "approved" && row.status !== "pending"}
+        >
+          Edit
+        </button>
+      ),
+    },
   ];
 
   if (isLoading) {
@@ -1146,6 +1395,31 @@ export const ReviewsSection = ({ session }) => {
           />
         )}
       </Card>
+
+      {/* Edit Review Modal */}
+      {editReviewModalOpen && selectedReview && (
+        <ReviewModal
+          isOpen={editReviewModalOpen}
+          onClose={() => {
+            setEditReviewModalOpen(false);
+            setSelectedReview(null);
+          }}
+          product={{
+            _id: selectedReview._id,
+            name: selectedReview.name,
+            images: selectedReview.images,
+          }}
+          orderId={selectedReview.orderId}
+          initialReview={{
+            rating: selectedReview.initialRating,
+            title: selectedReview.initialTitle,
+            comment: selectedReview.initialComment,
+            images: selectedReview.initialImages,
+          }}
+          isEditMode={true}
+          reviewId={selectedReview.reviewId}
+        />
+      )}
     </>
   );
 };

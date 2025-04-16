@@ -1,35 +1,55 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
+import axios from 'axios';
 import styles from './ImageSlider.module.css';
 
-const images = [
-  '/banner/1.jpg',
-  '/banner/2.jpg',
-  '/banner/3.jpg',
-];
-
 export default function ImageSlider() {
+  const [banners, setBanners] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showArrows, setShowArrows] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const touchStartXRef = useRef(0);
   const touchCurrentXRef = useRef(0);
   const interactionTimeout = useRef(null);
 
+  // Fetch banners from the API
+  useEffect(() => {
+    const fetchBanners = async () => {
+      try {
+        setIsLoading(true);
+        const response = await axios.get('/api/banner?activeOnly=true');
+        setBanners(response.data.banners || []);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching banners:', err);
+        setError('Failed to load banners');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchBanners();
+  }, []);
+
   const handleNext = () => {
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length);
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % banners.length);
   };
 
   const handlePrevious = () => {
     setCurrentIndex((prevIndex) =>
-      prevIndex === 0 ? images.length - 1 : prevIndex - 1
+      prevIndex === 0 ? banners.length - 1 : prevIndex - 1
     );
   };
 
+  // Auto-slide interval
   useEffect(() => {
-    const interval = setInterval(handleNext, 5000);
-    return () => clearInterval(interval);
-  }, []);
+    if (banners.length > 0) {
+      const interval = setInterval(handleNext, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [banners]);
 
   const resetArrowTimeout = () => {
     clearTimeout(interactionTimeout.current);
@@ -38,8 +58,10 @@ export default function ImageSlider() {
   };
 
   useEffect(() => {
-    resetArrowTimeout();
-  }, []);
+    if (banners.length > 0) {
+      resetArrowTimeout();
+    }
+  }, [banners]);
 
   const handleTouchStart = (e) => {
     touchStartXRef.current = e.touches[0].clientX;
@@ -55,9 +77,9 @@ export default function ImageSlider() {
     imageWrappers.forEach((wrapper, index) => {
       if (index === currentIndex) {
         wrapper.style.transform = `translateX(${progress * -100}%)`;
-      } else if (index === currentIndex - 1 || (currentIndex === 0 && index === images.length - 1)) {
+      } else if (index === currentIndex - 1 || (currentIndex === 0 && index === banners.length - 1)) {
         wrapper.style.transform = `translateX(${-100 + progress * -100}%)`;
-      } else if (index === currentIndex + 1 || (currentIndex === images.length - 1 && index === 0)) {
+      } else if (index === currentIndex + 1 || (currentIndex === banners.length - 1 && index === 0)) {
         wrapper.style.transform = `translateX(${100 + progress * -100}%)`;
       }
     });
@@ -78,6 +100,30 @@ export default function ImageSlider() {
     resetArrowTimeout();
   };
 
+  // Render loading state
+  if (isLoading) {
+    return (
+      <div className="relative w-full max-w-screen mx-auto my-8 overflow-hidden">
+        <div className={styles.imageContainer}>
+          <div className="animate-pulse bg-gray-200 w-full h-[450px] rounded-[15px]"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Render error state
+  if (error || banners.length === 0) {
+    return (
+      <div className="relative w-full max-w-screen mx-auto my-8 overflow-hidden">
+        <div className={styles.imageContainer}>
+          <div className="flex items-center justify-center w-full h-[450px] bg-gray-100 rounded-[15px] text-gray-500">
+            {error || 'No banners available'}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="relative w-full max-w-screen mx-auto my-8 overflow-hidden"
@@ -89,7 +135,7 @@ export default function ImageSlider() {
       onTouchStartCapture={resetArrowTimeout}
     >
       <div className={styles.navigationDots}>
-        {images.map((_, index) => (
+        {banners.map((_, index) => (
           <button
             key={index}
             onClick={() => setCurrentIndex(index)}
@@ -99,20 +145,26 @@ export default function ImageSlider() {
       </div>
 
       <div className={styles.imageContainer}>
-        {images.map((image, index) => {
+        {banners.map((banner, index) => {
           const offset = index - currentIndex;
           const displayClass =
             offset === 0
               ? styles.centerImage
-              : offset === -1 || (currentIndex === 0 && index === images.length - 1)
+              : offset === -1 || (currentIndex === 0 && index === banners.length - 1)
               ? styles.leftImage
-              : offset === 1 || (currentIndex === images.length - 1 && index === 0)
+              : offset === 1 || (currentIndex === banners.length - 1 && index === 0)
               ? styles.rightImage
               : styles.hiddenImage;
 
           return (
-            <div key={index} className={`${styles.imageWrapper} ${displayClass}`}>
-              <Image src={image} alt={`Slide ${index}`} width={640} height={360} />
+            <div key={banner._id} className={`${styles.imageWrapper} ${displayClass}`}>
+              <Image
+                src={banner.imageUrl}
+                alt={banner.title || `Slide ${index}`}
+                width={640}
+                height={360}
+                style={{ objectFit: 'cover' }}
+              />
             </div>
           );
         })}
@@ -120,8 +172,8 @@ export default function ImageSlider() {
 
       {showArrows && (
         <>
-          <button onClick={handlePrevious} className={styles.arrowButtonLeft}>&#10094;</button>
-          <button onClick={handleNext} className={styles.arrowButtonRight}>&#10095;</button>
+          <button onClick={handlePrevious} className={styles.arrowButtonLeft}>❮</button>
+          <button onClick={handleNext} className={styles.arrowButtonRight}>❯</button>
         </>
       )}
     </div>

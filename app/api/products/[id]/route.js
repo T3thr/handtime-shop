@@ -4,10 +4,18 @@ import dbConnect from "@/backend/lib/mongodb";
 
 export async function GET(request, { params }) {
   await dbConnect();
-  const { id } = params; // Extract ID from dynamic route params
+  const { id } = params;
+
+  // Add validation for the ID
+  if (!id || id === 'undefined') {
+    return new Response(JSON.stringify({ message: "Invalid product ID" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
   try {
-    const product = await Product.findById(id).lean(); // Convert Mongoose doc to plain object
+    const product = await Product.findById(id).lean();
     if (!product) {
       return new Response(JSON.stringify({ message: "Product not found" }), {
         status: 404,

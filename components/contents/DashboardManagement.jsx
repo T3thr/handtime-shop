@@ -1,12 +1,13 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { FaUsers, FaShoppingCart, FaChartLine, FaEdit, FaTrash, FaStar , FaSortUp , FaSortDown } from "react-icons/fa";
+import { FaUsers, FaShoppingCart, FaChartLine, FaEdit, FaTrash, FaStar, FaSortUp, FaSortDown, FaImage } from "react-icons/fa";
 import { useAllOrders, updateOrderStatus, deleteOrder, useUsers, updateUser } from "@/backend/lib/dashboardAction";
 import { toast } from "react-toastify";
 import Image from "next/image";
 import AllOrderModal from "./AllOrderModal";
 import { useAllReviews, updateReviewStatus, deleteReview } from "@/hooks/reviewHooks";
+import { BannerManagement } from "./BannerManagement";
 
 // User Management Component
 export const UserManagement = () => {
@@ -465,11 +466,6 @@ export const OrderManagement = () => {
                 Order ID {getSortIcon("_id")}
               </th>
               <th 
-                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider"
-              >
-                Customer
-              </th>
-              <th 
                 className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
                 onClick={() => requestSort("createdAt")}
               >
@@ -481,8 +477,11 @@ export const OrderManagement = () => {
               >
                 Status {getSortIcon("status")}
               </th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                Customer
+              </th>
               <th 
-                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
                 onClick={() => requestSort("totalAmount")}
               >
                 Total {getSortIcon("totalAmount")}
@@ -495,33 +494,8 @@ export const OrderManagement = () => {
           <tbody className="divide-y divide-border-primary">
             {sortedOrders.map((order) => (
               <tr key={order._id} className="hover:bg-background-hover transition-colors">
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-primary">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-primary">
                   {order._id.substring(0, 8)}...
-                </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    {order.userId && (
-                      <>
-                        <div className="h-10 w-10 flex-shrink-0 relative rounded-full overflow-hidden">
-                          <Image
-                            src={order.userId.avatar || "/images/avatar-placeholder.jpg"}
-                            alt={order.userId.name}
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-text-primary">{order.userId.name}</div>
-                          <div className="text-sm text-text-secondary">{order.userId.email}</div>
-                        </div>
-                      </>
-                    )}
-                    {!order.userId && (
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-text-primary">Guest User</div>
-                      </div>
-                    )}
-                  </div>
                 </td>
                 <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
                   {new Date(order.createdAt).toLocaleDateString()}
@@ -535,15 +509,35 @@ export const OrderManagement = () => {
                     {order.status}
                   </span>
                 </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-primary">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 flex-shrink-0 relative rounded-full overflow-hidden">
+                      <Image
+                        src={
+                          order.userId?.avatar ||
+                          "/images/avatar-placeholder.jpg"
+                        }
+                        alt={order.userId?.name || "Guest"}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="ml-3">
+                      <div className="text-sm font-medium text-text-primary">
+                        {order.userId?.name || "Guest User"}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-primary text-right">
                   ${order.totalAmount.toFixed(2)}
                 </td>
                 <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <button
                     onClick={() => handleViewOrder(order)}
-                    className="text-blue-600 hover:text-blue-900 mr-3"
+                    className="text-indigo-600 hover:text-indigo-900"
                   >
-                    View
+                    View Details
                   </button>
                 </td>
               </tr>
@@ -584,7 +578,7 @@ export const OrderManagement = () => {
         </div>
       </div>
 
-      {/* View Order Modal with AllOrderModal */}
+      {/* Order Details Modal */}
       <AllOrderModal
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}
@@ -597,8 +591,8 @@ export const OrderManagement = () => {
   );
 };
 
-// Review Management Component
-export const ReviewManagement = () => {
+// Reviews Management Component
+export const ReviewsManagement = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const {
     reviews,
@@ -607,49 +601,29 @@ export const ReviewManagement = () => {
     pagination,
     changePage,
     changeLimit,
-    updateReviewStatus,
-    deleteReview,
     refetch: refetchReviews,
   } = useAllReviews(1, 10, statusFilter);
 
-  const [selectedReview, setSelectedReview] = useState(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-  const [newStatus, setNewStatus] = useState("");
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
-
-  const handleDeleteClick = (review) => {
-    setSelectedReview(review);
-    setIsDeleteModalOpen(true);
-  };
-
-  const handleStatusClick = (review, status) => {
-    setSelectedReview(review);
-    setNewStatus(status);
-    setIsStatusModalOpen(true);
-  };
-
-  const handleDeleteConfirm = async () => {
+  const handleUpdateStatus = async (reviewId, newStatus) => {
     try {
-      await deleteReview(selectedReview._id);
-      toast.success("Review deleted successfully");
-      setIsDeleteModalOpen(false);
+      await updateReviewStatus(reviewId, newStatus);
       refetchReviews();
+      toast.success(`Review status updated to ${newStatus}`);
     } catch (error) {
-      console.error("Error deleting review:", error);
-      toast.error("Failed to delete review");
+      console.error("Failed to update review status:", error);
+      toast.error("Failed to update review status");
     }
   };
 
-  const handleStatusConfirm = async () => {
+  const handleDeleteReview = async (reviewId) => {
+    if (!confirm("Are you sure you want to delete this review?")) return;
+
     try {
-      await updateReviewStatus(selectedReview._id, newStatus);
-      toast.success(`Review ${newStatus} successfully`);
-      setIsStatusModalOpen(false);
+      await deleteReview(reviewId);
       refetchReviews();
     } catch (error) {
-      console.error("Error updating review status:", error);
-      toast.error("Failed to update review status");
+      console.error("Failed to delete review:", error);
+      toast.error("Failed to delete review");
     }
   };
 
@@ -663,6 +637,279 @@ export const ReviewManagement = () => {
         return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  if (isLoading) return <div className="text-center py-10">Loading reviews...</div>;
+  if (isError) return <div className="text-center py-10 text-red-500">Failed to load reviews</div>;
+
+  return (
+    <div className="space-y-6 px-4 sm:px-0">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <h2 className="text-xl sm:text-2xl font-bold">Review Management</h2>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <select
+            className="w-full sm:w-auto px-3 py-2 border rounded-md bg-background text-text-primary"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="all">All Reviews</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <select
+            className="w-full sm:w-auto px-3 py-2 border rounded-md bg-background text-text-primary"
+            value={pagination.limit}
+            onChange={(e) => changeLimit(Number(e.target.value))}
+          >
+            <option value={5}>5 per page</option>
+            <option value={10}>10 per page</option>
+            <option value={20}>20 per page</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-background border border-border-primary rounded-lg">
+          <thead className="bg-background-secondary">
+            <tr>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                Product
+              </th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                User
+              </th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                Rating
+              </th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                Review
+              </th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                Status
+              </th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                Date
+              </th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border-primary">
+            {reviews.map((review) => (
+              <tr key={review._id} className="hover:bg-background-hover transition-colors">
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    <div className="h-10 w-10 flex-shrink-0 relative rounded-md overflow-hidden">
+                      <Image
+                        src={review.productId?.images?.[0]?.url || "/images/placeholder.jpg"}
+                        alt={review.productId?.name || "Product"}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="ml-4">
+                      <div className="text-sm font-medium text-text-primary">
+                        {review.productId?.name || "Unknown Product"}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 flex-shrink-0 relative rounded-full overflow-hidden">
+                      <Image
+                        src={review.userId?.avatar || "/images/avatar-placeholder.jpg"}
+                        alt={review.userId?.name || "User"}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="ml-3">
+                      <div className="text-sm font-medium text-text-primary">
+                        {review.userId?.name || "Unknown User"}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center text-yellow-400">
+                    {[...Array(5)].map((_, i) => (
+                      <FaStar
+                        key={i}
+                        className={i < review.rating ? "text-yellow-400" : "text-gray-300"}
+                      />
+                    ))}
+                  </div>
+                </td>
+                <td className="px-4 sm:px-6 py-4">
+                  <div className="text-sm text-text-primary font-medium">{review.title}</div>
+                  <div className="text-sm text-text-secondary line-clamp-2">{review.comment}</div>
+                  {review.images && review.images.length > 0 && (
+                    <div className="flex mt-2 space-x-2">
+                      {review.images.map((image, index) => (
+                        <div key={index} className="h-8 w-8 relative rounded-md overflow-hidden">
+                          <Image
+                            src={image}
+                            alt={`Review image ${index + 1}`}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </td>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                  <span
+                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
+                      review.status
+                    )}`}
+                  >
+                    {review.status}
+                  </span>
+                </td>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
+                  {new Date(review.createdAt).toLocaleDateString()}
+                </td>
+                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <div className="flex space-x-2">
+                    {review.status === "pending" && (
+                      <>
+                        <button
+                          onClick={() => handleUpdateStatus(review._id, "approved")}
+                          className="text-green-600 hover:text-green-900"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleUpdateStatus(review._id, "rejected")}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Reject
+                        </button>
+                      </>
+                    )}
+                    {review.status === "approved" && (
+                      <button
+                        onClick={() => handleUpdateStatus(review._id, "rejected")}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Reject
+                      </button>
+                    )}
+                    {review.status === "rejected" && (
+                      <button
+                        onClick={() => handleUpdateStatus(review._id, "approved")}
+                        className="text-green-600 hover:text-green-900"
+                      >
+                        Approve
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDeleteReview(review._id)}
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      <FaTrash />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mt-4 gap-4">
+        <div className="text-sm text-text-secondary">
+          Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
+          {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} reviews
+        </div>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => changePage(pagination.page - 1)}
+            disabled={pagination.page === 1}
+            className={`px-3 py-1 rounded-md ${
+              pagination.page === 1
+                ? "bg-background-secondary text-text-secondary cursor-not-allowed"
+                : "bg-primary text-white hover:bg-primary-hover"
+            }`}
+          >
+            Previous
+          </button>
+          <button
+            onClick={() => changePage(pagination.page + 1)}
+            disabled={pagination.page === pagination.totalPages}
+            className={`px-3 py-1 rounded-md ${
+              pagination.page === pagination.totalPages
+                ? "bg-background-secondary text-text-secondary cursor-not-allowed"
+                : "bg-primary text-white hover:bg-primary-hover"
+            }`}
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Banner Management Component
+export const BannerManagementSection = () => {
+  return (
+    <div className="mb-8">
+      <div className="flex items-center mb-4">
+        <FaImage className="mr-2 text-primary" />
+        <h2 className="text-xl sm:text-2xl font-bold">Banner Management</h2>
+      </div>
+      <p className="text-text-secondary mb-6">
+        Manage homepage banner images. Active banners will be displayed in the image slider on the homepage.
+      </p>
+      <BannerManagement />
+    </div>
+  );
+};
+
+// Reviews Management Component
+export const ReviewManagement = () => {
+  const [statusFilter, setStatusFilter] = useState("all");
+  const {
+    reviews,
+    isLoading,
+    isError,
+    pagination,
+    changePage,
+    changeLimit,
+    refetch: refetchReviews,
+  } = useAllReviews(1, 10, statusFilter);
+
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+  const [selectedReview, setSelectedReview] = useState(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+
+  const handleUpdateStatus = async (reviewId, newStatus) => {
+    try {
+      await updateReviewStatus(reviewId, newStatus);
+      toast.success(`Review ${newStatus} successfully`);
+      refetchReviews();
+    } catch (error) {
+      console.error("Error updating review status:", error);
+      toast.error("Failed to update review status");
+    }
+  };
+
+  const handleDeleteReview = async (reviewId) => {
+    if (window.confirm("Are you sure you want to delete this review? This action cannot be undone.")) {
+      try {
+        await deleteReview(reviewId);
+        refetchReviews();
+      } catch (error) {
+        console.error("Error deleting review:", error);
+        toast.error("Failed to delete review");
+      }
     }
   };
 
@@ -686,6 +933,32 @@ export const ReviewManagement = () => {
           className={`h-3 w-3 -mt-1 ${sortConfig.key === key && sortConfig.direction === 'descending' ? 'text-primary' : 'text-text-secondary opacity-30'}`} 
         />
       </span>
+    );
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "approved":
+        return "bg-green-100 text-green-800";
+      case "rejected":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const renderStars = (rating) => {
+    return (
+      <div className="flex">
+        {[...Array(5)].map((_, i) => (
+          <FaStar
+            key={i}
+            className={i < rating ? "text-yellow-400" : "text-gray-300"}
+          />
+        ))}
+      </div>
     );
   };
 
@@ -750,249 +1023,154 @@ export const ReviewManagement = () => {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full bg-background border border-border-primary rounded-lg">
-          <thead className="bg-background-secondary">
-            <tr>
-              <th 
-                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
-                onClick={() => requestSort("productId.name")}
-              >
-                Product {getSortIcon("productId.name")}
-              </th>
-              <th 
-                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
-                onClick={() => requestSort("userId.name")}
-              >
-                Customer {getSortIcon("userId.name")}
-              </th>
-              <th 
-                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
-                onClick={() => requestSort("rating")}
-              >
-                Rating {getSortIcon("rating")}
-              </th>
-              <th 
-                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider"
-              >
-                Review
-              </th>
-              <th 
-                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
-                onClick={() => requestSort("status")}
-              >
-                Status {getSortIcon("status")}
-              </th>
-              <th 
-                className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
-                onClick={() => requestSort("createdAt")}
-              >
-                Date {getSortIcon("createdAt")}
-              </th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border-primary">
-            {sortedReviews.map((review) => (
-              <tr key={review._id} className="hover:bg-background-hover transition-colors">
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="h-10 w-10 flex-shrink-0 relative rounded-md overflow-hidden">
-                      <Image
-                        src={review.productId?.images?.[0]?.url || "/images/placeholder.jpg"}
-                        alt={review.productId?.name || "Product"}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-text-primary">{review.productId?.name || "Unknown Product"}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 flex-shrink-0 relative rounded-full overflow-hidden">
-                      <Image
-                        src={review.userId?.avatar || "/images/avatar-placeholder.jpg"}
-                        alt={review.userId?.name || "User"}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="ml-3">
-                      <div className="text-sm font-medium text-text-primary">{review.userId?.name || "Anonymous"}</div>
-                      <div className="text-xs text-text-secondary">{review.userId?.email || ""}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center text-yellow-400">
-                    {[...Array(5)].map((_, i) => (
-                      <FaStar
-                        key={i}
-                        className={i < review.rating ? "text-yellow-400" : "text-gray-300"}
-                        size={16}
-                      />
-                    ))}
-                    <span className="ml-1 text-text-primary">{review.rating}</span>
-                  </div>
-                </td>
-                <td className="px-4 sm:px-6 py-4">
-                  <div className="text-sm text-text-primary max-w-xs truncate">
-                    {review.title && <span className="font-medium">{review.title}: </span>}
-                    {review.comment}
-                  </div>
-                  {review.images && review.images.length > 0 && (
-                    <div className="flex mt-1 space-x-1">
-                      {review.images.slice(0, 3).map((image, idx) => (
-                        <div key={idx} className="h-6 w-6 relative rounded overflow-hidden">
-                          <Image src={image} alt={`Review image ${idx + 1}`} fill className="object-cover" />
-                        </div>
-                      ))}
-                      {review.images.length > 3 && (
-                        <div className="h-6 w-6 bg-background-secondary rounded flex items-center justify-center text-xs">
-                          +{review.images.length - 3}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                  <span
-                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
-                      review.status
-                    )}`}
-                  >
-                    {review.status}
-                  </span>
-                </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
-                  {new Date(review.createdAt).toLocaleDateString()}
-                </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  {review.status === "pending" && (
-                    <>
-                      <button
-                        onClick={() => handleStatusClick(review, "approved")}
-                        className="text-green-600 hover:text-green-900 mr-2"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleStatusClick(review, "rejected")}
-                        className="text-red-600 hover:text-red-900 mr-2"
-                      >
-                        Reject
-                      </button>
-                    </>
-                  )}
-                  <button
-                    onClick={() => handleDeleteClick(review)}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    <FaTrash className="inline" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {reviews.length === 0 && (
+      {reviews && reviews.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-background border border-border-primary rounded-lg">
+            <thead className="bg-background-secondary">
               <tr>
-                <td colSpan="7" className="px-4 sm:px-6 py-4 text-center text-text-secondary">
-                  No reviews found
-                </td>
+                <th 
+                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                  onClick={() => requestSort("productId.name")}
+                >
+                  Product {getSortIcon("productId.name")}
+                </th>
+                <th 
+                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                  onClick={() => requestSort("userId.name")}
+                >
+                  Customer {getSortIcon("userId.name")}
+                </th>
+                <th 
+                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                  onClick={() => requestSort("rating")}
+                >
+                  Rating {getSortIcon("rating")}
+                </th>
+                <th 
+                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider"
+                >
+                  Comment
+                </th>
+                <th 
+                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                  onClick={() => requestSort("status")}
+                >
+                  Status {getSortIcon("status")}
+                </th>
+                <th 
+                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
+                  onClick={() => requestSort("createdAt")}
+                >
+                  Date {getSortIcon("createdAt")}
+                </th>
+                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mt-4 gap-4">
-        <div className="text-sm text-text-secondary">
-          Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
-          {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} reviews
+            </thead>
+            <tbody className="divide-y divide-border-primary">
+              {sortedReviews.map((review) => (
+                <tr key={review._id} className="hover:bg-background-hover transition-colors">
+                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-text-primary">
+                    {review.productId?.name || "Unknown Product"}
+                  </td>
+                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-primary">
+                    {review.userId?.name || "Anonymous"}
+                  </td>
+                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                    {renderStars(review.rating)}
+                  </td>
+                  <td className="px-4 sm:px-6 py-4 text-sm text-text-primary">
+                    <div className="max-w-xs truncate">{review.comment}</div>
+                  </td>
+                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                    <span
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
+                        review.status
+                      )}`}
+                    >
+                      {review.status}
+                    </span>
+                  </td>
+                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
+                    {new Date(review.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex space-x-2">
+                      {review.status === "pending" && (
+                        <>
+                          <button
+                            onClick={() => handleUpdateStatus(review._id, "approved")}
+                            className="text-green-600 hover:text-green-900"
+                            title="Approve"
+                          >
+                            <FaCheck />
+                          </button>
+                          <button
+                            onClick={() => handleUpdateStatus(review._id, "rejected")}
+                            className="text-red-600 hover:text-red-900"
+                            title="Reject"
+                          >
+                            <FaTimes />
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={() => handleDeleteReview(review._id)}
+                        className="text-red-600 hover:text-red-900"
+                        title="Delete"
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => changePage(pagination.page - 1)}
-            disabled={pagination.page === 1}
-            className={`px-3 py-1 rounded-md ${
-              pagination.page === 1
-                ? "bg-background-secondary text-text-secondary cursor-not-allowed"
-                : "bg-primary text-white hover:bg-primary-hover"
-            }`}
-          >
-            Previous
-          </button>
-          <button
-            onClick={() => changePage(pagination.page + 1)}
-            disabled={pagination.page === pagination.totalPages}
-            className={`px-3 py-1 rounded-md ${
-              pagination.page === pagination.totalPages
-                ? "bg-background-secondary text-text-secondary cursor-not-allowed"
-                : "bg-primary text-white hover:bg-primary-hover"
-            }`}
-          >
-            Next
-          </button>
-        </div>
-      </div>
-
-      {/* Delete Confirmation Modal */}
-      {isDeleteModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
-          <div className="bg-background rounded-lg p-4 sm:p-6 w-full max-w-md">
-            <h3 className="text-lg sm:text-xl font-bold mb-4">Delete Review</h3>
-            <p className="mb-4 text-text-secondary">
-              Are you sure you want to delete this review? This action cannot be undone.
-            </p>
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={() => setIsDeleteModalOpen(false)}
-                className="px-4 py-2 border border-border-primary rounded-md hover:bg-background-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteConfirm}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
+      ) : (
+        <div className="text-center py-10 bg-background-secondary rounded-lg">
+          <FaStar className="mx-auto h-12 w-12 text-text-muted mb-3" />
+          <h3 className="text-lg font-medium text-text-primary">No reviews found</h3>
+          <p className="text-text-secondary mt-1">
+            {statusFilter !== "all"
+              ? `There are no ${statusFilter} reviews at the moment.`
+              : "There are no reviews in the system yet."}
+          </p>
         </div>
       )}
 
-      {/* Status Change Confirmation Modal */}
-      {isStatusModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
-          <div className="bg-background rounded-lg p-4 sm:p-6 w-full max-w-md">
-            <h3 className="text-lg sm:text-xl font-bold mb-4">
-              {newStatus === "approved" ? "Approve" : "Reject"} Review
-            </h3>
-            <p className="mb-4 text-text-secondary">
-              Are you sure you want to {newStatus === "approved" ? "approve" : "reject"} this review?
-            </p>
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={() => setIsStatusModalOpen(false)}
-                className="px-4 py-2 border border-border-primary rounded-md hover:bg-background-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleStatusConfirm}
-                className={`px-4 py-2 ${
-                  newStatus === "approved" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
-                } text-white rounded-md`}
-              >
-                Confirm
-              </button>
-            </div>
+      {/* Pagination */}
+      {reviews && reviews.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mt-4 gap-4">
+          <div className="text-sm text-text-secondary">
+            Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
+            {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} reviews
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => changePage(pagination.page - 1)}
+              disabled={pagination.page === 1}
+              className={`px-3 py-1 rounded-md ${
+                pagination.page === 1
+                  ? "bg-background-secondary text-text-secondary cursor-not-allowed"
+                  : "bg-primary text-white hover:bg-primary-hover"
+              }`}
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => changePage(pagination.page + 1)}
+              disabled={pagination.page === pagination.totalPages}
+              className={`px-3 py-1 rounded-md ${
+                pagination.page === pagination.totalPages
+                  ? "bg-background-secondary text-text-secondary cursor-not-allowed"
+                  : "bg-primary text-white hover:bg-primary-hover"
+              }`}
+            >
+              Next
+            </button>
           </div>
         </div>
       )}

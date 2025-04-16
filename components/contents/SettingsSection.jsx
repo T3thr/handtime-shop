@@ -1,138 +1,118 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { useUserData } from "@/hooks/dashboardHooks";
-import {
-  SectionHeader,
-  Card,
-  LoadingSpinner,
-} from "@/components/contents/DashboardUI";
-import { FaMapMarkerAlt, FaSignOutAlt } from "react-icons/fa";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import Image from "next/image";
+import { FaMapMarkerAlt } from "react-icons/fa";
+import { toast } from "react-toastify";
 import axios from "axios";
+import { SectionHeader, Card, LoadingSpinner } from "@/components/contents/DashboardUI";
 import AddressManagement from "./AddressManagement";
-import SignoutModal from "../auth/SignoutModal";
 
 export const SettingsSection = ({ session }) => {
-  const { userData, isLoading, isError } = useUserData();
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState("addresses");
+  const [isLoading, setIsLoading] = useState(false);
   const [addresses, setAddresses] = useState([]);
-  const [isAddressLoading, setIsAddressLoading] = useState(true);
-  const [isSignoutModalOpen, setIsSignoutModalOpen] = useState(false);
+  const [userData, setUserData] = useState({
+    name: session?.user?.name || "",
+    email: session?.user?.email || "",
+    role: session?.user?.role || "user",
+    avatar: session?.user?.image || "/images/avatar-placeholder.jpg"
+  });
 
+  // Fetch addresses and user data when component mounts
   useEffect(() => {
-    fetchAddresses();
-  }, []);
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Fetch addresses
+        const addressResponse = await axios.get("/api/user/address");
+        setAddresses(addressResponse.data.addresses || []);
+        
+        // Fetch user data
+        const userResponse = await axios.get("/api/user");
+        if (userResponse.data) {
+          setUserData({
+            name: userResponse.data.name || userData.name,
+            email: userResponse.data.email || userData.email,
+            role: userResponse.data.role || userData.role,
+            avatar: userResponse.data.avatar || userData.avatar
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch data:", error);
+        toast.error("Failed to load user data");
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const fetchAddresses = async () => {
-    setIsAddressLoading(true);
+    fetchData();
+  }, [session]);
+
+  const handleAddressChange = async () => {
     try {
+      setIsLoading(true);
       const response = await axios.get("/api/user/address");
       setAddresses(response.data.addresses || []);
     } catch (error) {
-      console.error("Failed to fetch addresses:", error);
+      console.error("Failed to refresh addresses:", error);
     } finally {
-      setIsAddressLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleSignoutConfirm = () => {
-    router.push("/api/auth/signout");
-  };
-
-  if (isLoading) {
-    return <LoadingSpinner />;
-  }
-
-  if (isError) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-error mb-4">Failed to load user data</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-primary text-text-inverted rounded-lg hover:bg-primary-dark transition-colors duration-300"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  const tabs = [
-    { id: "addresses", label: "Addresses", icon: FaMapMarkerAlt },
-  ];
-
   return (
     <>
-      <SectionHeader title="Account Settings" />
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Sidebar */}
-        <Card className="md:col-span-1 p-0 overflow-hidden">
-          <div className="p-6 bg-background-secondary border-b border-border-primary">
-            <div className="flex items-center">
-              <div className="w-12 h-12 relative rounded-full overflow-hidden mr-4">
-                <Image
-                  src={userData?.avatar || "/images/avatar-placeholder.jpg"}
-                  alt={userData?.name || "User"}
-                  fill
-                  className="object-cover"
-                />
-              </div>
-              <div>
-                <h3 className="font-medium text-text-primary">{userData?.name}</h3>
-                <p className="text-sm text-text-secondary">{userData?.email}</p>
+      <SectionHeader title="Address Management" subtitle="Manage your shipping addresses" />
+      
+      {/* User Profile Card */}
+      <div className="mb-6">
+        <Card>
+          <div className="flex items-center p-4">
+            <div className="relative w-16 h-16 rounded-full overflow-hidden mr-4 border-2 border-primary">
+              <img 
+                src={userData.avatar} 
+                alt={userData.name} 
+                className="object-cover w-full h-full"
+              />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-text-primary">{userData.name}</h2>
+              <p className="text-text-secondary">{userData.email}</p>
+              <div className="mt-1">
+                <span className="inline-block px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
+                  {userData.role === "admin" ? "Administrator" : "Customer"}
+                </span>
               </div>
             </div>
           </div>
-          <nav className="p-2">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center p-3 rounded-lg text-left mb-1 transition-colors ${
-                  activeTab === tab.id
-                    ? "bg-primary text-white"
-                    : "hover:bg-background-hover text-text-primary"
-                }`}
-              >
-                <tab.icon className={`mr-3 ${activeTab === tab.id ? "text-white" : "text-text-secondary"}`} />
-                {tab.label}
-              </button>
-            ))}
-            <button
-              onClick={() => setIsSignoutModalOpen(true)}
-              className="w-full flex items-center p-3 rounded-lg text-left mb-1 text-error hover:bg-error/10 transition-colors"
-            >
-              <FaSignOutAlt className="mr-3" />
-              Sign Out
-            </button>
-          </nav>
-        </Card>
-
-        {/* Content */}
-        <Card className="md:col-span-3">
-          {activeTab === "addresses" && (
-            <div>
-              {isAddressLoading ? (
-                <LoadingSpinner />
-              ) : (
-                <AddressManagement addresses={addresses} onAddressChange={fetchAddresses} />
-              )}
-            </div>
-          )}
         </Card>
       </div>
-
-      {/* Signout Modal */}
-      <SignoutModal
-        isOpen={isSignoutModalOpen}
-        onClose={() => setIsSignoutModalOpen(false)}
-        onConfirm={handleSignoutConfirm}
-      />
+      
+      {/* Address Management Section */}
+      <Card>
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <LoadingSpinner />
+          </div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="p-4"
+          >
+            <div className="flex items-center mb-4">
+              <FaMapMarkerAlt className="text-primary mr-2 text-xl" />
+              <h2 className="text-xl font-bold">Your Addresses</h2>
+            </div>
+            
+            <AddressManagement 
+              addresses={addresses} 
+              onAddressChange={handleAddressChange} 
+            />
+          </motion.div>
+        )}
+      </Card>
     </>
   );
 };
-
-export default SettingsSection;

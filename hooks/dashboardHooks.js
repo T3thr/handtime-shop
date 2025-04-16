@@ -1,10 +1,10 @@
-// hooks/dashboardHooks.js
 "use client";
 
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
+// Other hooks (useUserData, useOrders, useAllOrders, useUsers) remain unchanged
 export const useUserData = () => {
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -209,6 +209,11 @@ export const useWishlist = (initialPage = 1, initialLimit = 10) => {
     totalPages: 0,
   });
 
+  // Validate ObjectId format
+  const isValidObjectId = (id) => {
+    return /^[0-9a-fA-F]{24}$/.test(id);
+  };
+
   useEffect(() => {
     const fetchWishlist = async () => {
       setIsLoading(true);
@@ -221,39 +226,44 @@ export const useWishlist = (initialPage = 1, initialLimit = 10) => {
         const wishlistItems = response.data.wishlist || [];
         const processedWishlist = await Promise.all(
           wishlistItems.map(async (item) => {
+            // Skip if productId is invalid
+            if (!item.productId || !isValidObjectId(item.productId)) {
+              console.warn(`Invalid productId: ${item.productId}`);
+              return null;
+            }
+
             try {
               const productResponse = await axios.get(`/api/products/${item.productId}`);
               const product = productResponse.data;
+              if (!product._id) {
+                console.warn(`Product missing _id: ${item.productId}`);
+                return null;
+              }
               return {
                 productId: item.productId,
+                _id: product._id,
                 name: product.name,
                 price: product.price,
                 description: product.description,
-                image:
-                  product.images && product.images.length > 0 ? product.images[0].url : null,
-                category:
-                  product.categories && product.categories.length > 0
-                    ? product.categories[0]
-                    : "",
+                shortDescription: product.shortDescription || product.description,
+                images: product.images && product.images.length > 0 ? product.images : [{ url: "/images/placeholder.jpg" }],
+                categories: product.categories && product.categories.length > 0 ? product.categories : [],
+                quantity: product.quantity || 0,
+                continueSellingWhenOutOfStock: product.continueSellingWhenOutOfStock || false,
+                averageRating: product.averageRating || 0,
+                reviewCount: product.reviewCount || 0,
                 status: product.status,
                 addedAt: item.addedAt,
               };
             } catch (error) {
               console.error(`Error fetching product ${item.productId}:`, error);
-              return {
-                productId: item.productId,
-                name: "Product not available",
-                price: 0,
-                description: "",
-                image: null,
-                category: "",
-                status: "inactive",
-                addedAt: item.addedAt,
-              };
+              return null;
             }
           })
         );
-        setWishlist(processedWishlist);
+        // Filter out null entries (invalid or failed products)
+        const validWishlist = processedWishlist.filter((item) => item !== null);
+        setWishlist(validWishlist);
         setPagination({
           page: response.data.page || pagination.page,
           limit: response.data.limit || pagination.limit,
@@ -288,6 +298,12 @@ export const useWishlist = (initialPage = 1, initialLimit = 10) => {
   };
 
   const toggleWishlistItem = async (productId) => {
+    if (!isValidObjectId(productId)) {
+      console.error("Invalid productId for toggle:", productId);
+      toast.error("Cannot update wishlist: Invalid product");
+      return;
+    }
+
     try {
       const response = await axios.post("/api/wishlist", {
         productId,
@@ -300,39 +316,42 @@ export const useWishlist = (initialPage = 1, initialLimit = 10) => {
         const wishlistItems = refreshResponse.data.wishlist || [];
         const processedWishlist = await Promise.all(
           wishlistItems.map(async (item) => {
+            if (!item.productId || !isValidObjectId(item.productId)) {
+              console.warn(`Invalid productId: ${item.productId}`);
+              return null;
+            }
+
             try {
               const productResponse = await axios.get(`/api/products/${item.productId}`);
               const product = productResponse.data;
+              if (!product._id) {
+                console.warn(`Product missing _id: ${item.productId}`);
+                return null;
+              }
               return {
                 productId: item.productId,
+                _id: product._id,
                 name: product.name,
                 price: product.price,
                 description: product.description,
-                image:
-                  product.images && product.images.length > 0 ? product.images[0].url : null,
-                category:
-                  product.categories && product.categories.length > 0
-                    ? product.categories[0]
-                    : "",
+                shortDescription: product.shortDescription || product.description,
+                images: product.images && product.images.length > 0 ? product.images : [{ url: "/images/placeholder.jpg" }],
+                categories: product.categories && product.categories.length > 0 ? product.categories : [],
+                quantity: product.quantity || 0,
+                continueSellingWhenOutOfStock: product.continueSellingWhenOutOfStock || false,
+                averageRating: product.averageRating || 0,
+                reviewCount: product.reviewCount || 0,
                 status: product.status,
                 addedAt: item.addedAt,
               };
             } catch (error) {
               console.error(`Error fetching product ${item.productId}:`, error);
-              return {
-                productId: item.productId,
-                name: "Product not available",
-                price: 0,
-                description: "",
-                image: null,
-                category: "",
-                status: "inactive",
-                addedAt: item.addedAt,
-              };
+              return null;
             }
           })
         );
-        setWishlist(processedWishlist);
+        const validWishlist = processedWishlist.filter((item) => item !== null);
+        setWishlist(validWishlist);
         setPagination({
           page: refreshResponse.data.page || pagination.page,
           limit: refreshResponse.data.limit || pagination.limit,
@@ -341,7 +360,7 @@ export const useWishlist = (initialPage = 1, initialLimit = 10) => {
         });
         toast.success("Added to wishlist");
       } else {
-        setWishlist((prev) => prev.filter((item) => item.productId !== productId));
+        setWishlist((prev) => prev.filter((item) => item._id !== productId));
         toast.success("Removed from wishlist");
       }
       return response.data;

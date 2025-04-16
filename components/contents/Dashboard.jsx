@@ -15,7 +15,8 @@ import {
   ManageStore, 
   UserManagement, 
   OrderManagement,
-  ReviewManagement
+  ReviewsManagement,
+  BannerManagementSection
 } from "@/components/contents/DashboardManagement";
 import { 
   ProductFormModal, 
@@ -199,7 +200,9 @@ export default function Dashboard({ session }) {
       case "allOrders":
         return <OrderManagement />;
       case "allReviews":
-        return <ReviewManagement />;
+        return <ReviewsManagement />;
+      case "banners":
+        return <BannerManagementSection />;
       case "settings":
         return <SettingsSection session={session} />;
       default:

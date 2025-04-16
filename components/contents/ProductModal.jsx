@@ -1,17 +1,15 @@
-
 "use client";
-import React, { useEffect, useState } from "react";
-import Image from "next/image";
-import { X, ChevronLeft, Heart, ShoppingBag, ChevronRight } from "lucide-react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import { useCart } from "@/context/CartContext";
-import { toast } from "react-toastify";
-import AuthContext from "@/context/AuthContext";
-import { useContext } from "react";
-import { useSidebar } from "@/context/SidebarContext";
+import { Heart, ShoppingBag, X, ChevronLeft, ChevronRight, Star, Share2, MessageSquare } from "lucide-react";
 import { FaStar, FaRegStar, FaStarHalfAlt, FaUser } from "react-icons/fa";
-import { useReviews } from "@/hooks/reviewHooks";
+import { toast } from "react-toastify";
 import axios from "axios";
+import AuthContext from "@/context/AuthContext";
+import { useSidebar } from "@/context/SidebarContext";
+import { useReviews } from "@/hooks/reviewHooks";
 
 export default function ProductModal({ product: initialProduct, onClose, keyword = "" }) {
   const { addToCart, cartItems, getCartSummary, fetchProductDetails, productCache } = useCart();
@@ -22,11 +20,18 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
   const { openSidebar } = useSidebar();
   const [activeTab, setActiveTab] = useState("description");
   const [reviewsLoaded, setReviewsLoaded] = useState(false);
-  const { getProductReviews } = useReviews();
+  const { getProductReviews    ,reviews, 
+    averageRating, 
+    ratingCounts, 
+    isLoading: reviewsLoading, 
+    pagination, 
+    changePage,
+    total: reviewsTotal } = useReviews();
   const [ratingDistribution, setRatingDistribution] = useState([0, 0, 0, 0, 0]);
   const [loading, setLoading] = useState(true);
   const [isInWishlist, setIsInWishlist] = useState(false);
 
+  
   useEffect(() => {
     const loadProductDetails = async () => {
       try {
@@ -369,9 +374,11 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
 
                     <div className="flex items-center text-sm text-text-muted">
                       <div className="flex items-center mr-1">
-                        {renderStars(product.averageRating || 0)}
+                        {renderStars(product.reviews && product.reviews.length > 0 
+                          ? product.averageRating 
+                          : product.averageRating || 0)}
                       </div>
-                      <span>({product.reviewCount || 0})</span>
+                      <span>({product.reviews ? product.reviews.length : product.reviewCount || 0})</span>
                     </div>
                   </div>
 
@@ -480,110 +487,201 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
                       </div>
                     )}
 
-                    {activeTab === "reviews" && (
-                      <div className="space-y-6">
-                        {/* Review Summary */}
-                        <div className="bg-background-secondary p-4 rounded-lg">
-                          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                            <div className="flex items-center mb-4 md:mb-0">
-                              <div className="text-4xl font-bold text-text-primary mr-3">
-                                {product.averageRating ? product.averageRating.toFixed(1) : "0.0"}
-                              </div>
-                              <div>
-                                <div className="flex text-lg mb-1">
-                                  {renderStars(product.averageRating || 0)}
-                                </div>
-                                <div className="text-sm text-text-secondary">
-                                  Based on {product.reviewCount || 0} reviews
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* Rating Distribution */}
-                            <div className="w-full md:w-1/2">
-                              {[5, 4, 3, 2, 1].map((rating) => (
-                                <div key={rating} className="flex items-center mb-1">
-                                  <div className="w-8 text-sm text-text-secondary">{rating} ★</div>
-                                  <div className="flex-1 mx-2 h-2 bg-background rounded-full overflow-hidden">
-                                    <div 
-                                      className="h-full bg-primary rounded-full"
-                                      style={{ width: `${getPercentage(ratingDistribution[rating-1])}%` }}
-                                    ></div>
-                                  </div>
-                                  <div className="w-8 text-right text-sm text-text-secondary">
-                                    {getPercentage(ratingDistribution[rating-1])}%
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
+                {activeTab === "reviews" && (
+                  <div className="space-y-6">
+                    {/* Reviews Summary */}
+                    <div className="flex flex-col md:flex-row gap-6 border-b border-border-primary pb-6">
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="text-4xl font-bold text-text-primary">
+                          {averageRating ? averageRating.toFixed(1) : "0.0"}
                         </div>
-                        
-                        {/* Reviews List */}
-                        {product.reviews && product.reviews.length > 0 ? (
-                          <div className="space-y-4">
-                            {product.reviews.map((review) => (
-                              <div key={review._id} className="border-b border-border-primary pb-4">
-                                <div className="flex justify-between items-start mb-2">
-                                  <div className="flex items-center">
-                                    <div className="w-8 h-8 bg-background-secondary rounded-full flex items-center justify-center mr-2">
-                                      {review.user?.avatar ? (
-                                        <Image 
-                                          src={review.user.avatar} 
-                                          alt={review.user.name || "User"} 
-                                          width={32} 
-                                          height={32} 
-                                          className="rounded-full"
-                                        />
-                                      ) : (
-                                        <FaUser className="text-text-muted" />
-                                      )}
-                                    </div>
-                                    <div>
-                                      <div className="font-medium text-text-primary">
-                                        {review.user?.name || "Anonymous"}
-                                      </div>
-                                      <div className="text-xs text-text-secondary">
-                                        {formatDate(review.createdAt)}
-                                      </div>
-                                    </div>
+                        <div className="flex mt-2">{renderStars(averageRating || 0)}</div>
+                        <div className="text-sm text-text-secondary mt-1">
+                          {reviewsTotal || 0} {reviewsTotal === 1 ? "review" : "reviews"}
+                        </div>
+                      </div>
+
+                      <div className="flex-1">
+                        {[5, 4, 3, 2, 1].map((rating) => (
+                          <div key={rating} className="flex items-center mb-2">
+                            <div className="flex items-center w-16">
+                              <span className="text-sm text-text-secondary mr-1">{rating}</span>
+                              <FaStar className="text-yellow-400 text-sm" />
+                            </div>
+                            <div className="flex-1 h-2 bg-background-secondary rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-yellow-400 rounded-full"
+                                style={{ width: `${ratingDistribution[rating]}%` }}
+                              ></div>
+                            </div>
+                            <div className="w-12 text-right text-sm text-text-secondary">
+                              {ratingCounts && ratingCounts[rating] ? ratingCounts[rating] : 0}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Reviews List */}
+                    {reviewsLoading ? (
+                      <div className="flex justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      </div>
+                    ) : reviews && reviews.length > 0 ? (
+                      <div className="space-y-6">
+                        {reviews.map((review) => (
+                          <div key={review._id} className="border-b border-border-primary pb-6">
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="flex items-center">
+                                <div className="w-10 h-10 rounded-full bg-background-secondary flex items-center justify-center mr-3">
+                                  {review.userId?.avatar ? (
+                                    <Image
+                                      src={review.userId.avatar}
+                                      alt={review.userId.name || "User"}
+                                      width={40}
+                                      height={40}
+                                      className="rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <FaUser className="text-text-muted" />
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-medium text-text-primary">
+                                    {review.userId?.name || "Anonymous"}
                                   </div>
-                                  <div className="flex">
-                                    {renderStars(review.rating)}
+                                  <div className="text-xs text-text-secondary">
+                                    {formatDate(review.createdAt)}
                                   </div>
                                 </div>
-                                
-                                {review.title && (
-                                  <h4 className="font-medium text-text-primary mb-1">{review.title}</h4>
-                                )}
-                                
-                                <p className="text-text-secondary text-sm mb-2">{review.comment}</p>
-                                
-                                {/* Review Images */}
-                                {review.images && review.images.length > 0 && (
-                                  <div className="flex flex-wrap gap-2 mt-2">
-                                    {review.images.map((image, index) => (
-                                      <div key={index} className="relative w-16 h-16 rounded-md overflow-hidden">
-                                        <Image
-                                          src={image.url}
-                                          alt={`Review image ${index + 1}`}
-                                          fill
-                                          className="object-cover"
-                                        />
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
                               </div>
-                            ))}
+                              <div className="flex">{renderStars(review.rating)}</div>
+                            </div>
+
+                            {review.title && (
+                              <h4 className="font-medium text-text-primary mb-1">{review.title}</h4>
+                            )}
+                            <p className="text-text-secondary mb-3">{review.comment}</p>
+
+                            {review.images && review.images.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mt-3">
+                                {review.images.map((image, index) => (
+                                  <div
+                                    key={index}
+                                    className="relative w-16 h-16 rounded-md overflow-hidden"
+                                  >
+                                    <Image
+                                      src={image}
+                                      alt={`Review image ${index + 1}`}
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {review.verifiedPurchase && (
+                              <div className="mt-2 text-xs text-success flex items-center">
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="h-4 w-4 mr-1"
+                                  viewBox="0 0 20 20"
+                                  fill="currentColor"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                                Verified Purchase
+                              </div>
+                            )}
                           </div>
-                        ) : (
-                          <div className="text-center py-8 text-text-secondary">
-                            No reviews yet. Be the first to review this product!
+                        ))}
+
+                        {/* Pagination */}
+                        {pagination && pagination.totalPages > 1 && (
+                          <div className="flex justify-center mt-6">
+                            <div className="flex space-x-1">
+                              <button
+                                onClick={() => handlePageChange(Math.max(1, pagination.page - 1))}
+                                disabled={pagination.page === 1}
+                                className={`px-3 py-1 rounded-md ${
+                                  pagination.page === 1
+                                    ? "bg-background-secondary text-text-muted cursor-not-allowed"
+                                    : "bg-background-secondary text-text-primary hover:bg-background-hover"
+                                }`}
+                              >
+                                Previous
+                              </button>
+
+                              {[...Array(pagination.totalPages)].map((_, i) => {
+                                const page = i + 1;
+                                // Show current page, first page, last page, and pages around current
+                                if (
+                                  page === 1 ||
+                                  page === pagination.totalPages ||
+                                  (page >= pagination.page - 1 && page <= pagination.page + 1)
+                                ) {
+                                  return (
+                                    <button
+                                      key={page}
+                                      onClick={() => handlePageChange(page)}
+                                      className={`w-8 h-8 flex items-center justify-center rounded-md ${
+                                        pagination.page === page
+                                          ? "bg-primary text-text-inverted"
+                                          : "bg-background-secondary text-text-primary hover:bg-background-hover"
+                                      }`}
+                                    >
+                                      {page}
+                                    </button>
+                                  );
+                                } else if (
+                                  page === 2 ||
+                                  page === pagination.totalPages - 1
+                                ) {
+                                  return (
+                                    <button
+                                      key={page}
+                                      className="w-8 h-8 flex items-center justify-center"
+                                    >
+                                      ...
+                                    </button>
+                                  );
+                                }
+                                return null;
+                              })}
+
+                              <button
+                                onClick={() =>
+                                  handlePageChange(Math.min(pagination.totalPages, pagination.page + 1))
+                                }
+                                disabled={pagination.page === pagination.totalPages}
+                                className={`px-3 py-1 rounded-md ${
+                                  pagination.page === pagination.totalPages
+                                    ? "bg-background-secondary text-text-muted cursor-not-allowed"
+                                    : "bg-background-secondary text-text-primary hover:bg-background-hover"
+                                }`}
+                              >
+                                Next
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <MessageSquare className="w-12 h-12 mx-auto text-text-muted mb-2" />
+                        <h3 className="text-lg font-medium text-text-primary mb-1">No Reviews Yet</h3>
+                        <p className="text-text-secondary">
+                          Be the first to review this product
+                        </p>
+                      </div>
                     )}
+                  </div>
+                )}
                   </div>
 
                   <div className="pt-4 flex flex-col sm:flex-row gap-3">

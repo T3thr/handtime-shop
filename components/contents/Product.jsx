@@ -609,7 +609,7 @@ export default function Product() {
       {/* Filters Bar */}
       <div
         ref={featuredProductsRef}
-        className="bg-background/95 backdrop-blur-md border-y border-border-primary z-20 transition-all duration-300 sticky top-0"
+        className="bg-background/95 backdrop-blur-md border-y border-border-primary z-20 transition-all duration-300 sticky"
       >
         <div className="container mx-auto max-w-7xl px-4 lg:px-8 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -920,14 +920,19 @@ export default function Product() {
                           <Star
                             key={i}
                             className={`w-4 h-4 ${
-                              i < Math.round(product.averageRating || 0)
+                              i < Math.round(productReviews[product._id]?.averageRating || product.averageRating || 0)
                                 ? "text-warning fill-current"
                                 : "text-text-muted"
                             }`}
                           />
                         ))}
                         <span className="ml-2 text-xs text-text-secondary">
-                          ({product.averageRating?.toFixed(1) || "0"})
+                          {productReviews[product._id] 
+                            ? `(${productReviews[product._id].averageRating.toFixed(1)}) ${productReviews[product._id].reviewCount} reviews`
+                            : product.averageRating 
+                              ? `(${product.averageRating.toFixed(1)})`
+                              : "(0)"
+                          }
                         </span>
                       </div>
 

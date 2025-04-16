@@ -63,6 +63,7 @@ export const Sidebar = ({ activeSection, setActiveSection, session }) => {
     { id: "users", label: "Users", icon: FaUsers },
     { id: "allOrders", label: "All Orders", icon: FaClipboardList },
     { id: "allReviews", label: "All Reviews", icon: FaStar },
+    { id: "banners", label: "Banner Management", icon: FaGlobe },
   ];
 
   const generalNavItems = [

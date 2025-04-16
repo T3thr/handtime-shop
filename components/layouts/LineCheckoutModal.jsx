@@ -2,12 +2,13 @@
 "use client";
 import React, { useState, useCallback, useContext, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ExternalLink, Check, Copy } from "lucide-react";
+import { X, ExternalLink, Check, Copy, MapPin } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import AuthContext from "@/context/AuthContext";
 import { toast } from "react-toastify";
 import Image from "next/image";
 import liff from "@line/liff";
+import axios from "axios";
 
 const LineCheckoutModal = ({ isOpen, onClose }) => {
   const { cartItems, getCartSummary, clearCart } = useCart();
@@ -18,6 +19,9 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
   const [isLiffInitialized, setIsLiffInitialized] = useState(false);
   const [orderProcessed, setOrderProcessed] = useState(false);
   const [orderId, setOrderId] = useState(null);
+  const [addresses, setAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
+  const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
 
   const LINE_OA_ID = process.env.NEXT_PUBLIC_LINE_OA_ID || "@yourLineOaId";
   const LIFF_ID = process.env.NEXT_PUBLIC_LIFF_ID;
@@ -39,11 +43,58 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
     if (isOpen && !isLiffInitialized) initializeLiff();
   }, [isOpen, LIFF_ID, isLiffInitialized]);
 
+  // Fetch user addresses when modal opens
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      if (!isOpen || !user) return;
+      
+      setIsLoadingAddresses(true);
+      try {
+        const response = await axios.get("/api/user/address");
+        const addressData = response.data.addresses || [];
+        setAddresses(addressData);
+        
+        // Set default address as selected if available
+        const defaultAddress = addressData.find(addr => addr.isDefault);
+        if (defaultAddress) {
+          setSelectedAddressId(defaultAddress._id);
+        } else if (addressData.length > 0) {
+          setSelectedAddressId(addressData[0]._id);
+        }
+      } catch (error) {
+        console.error("Failed to fetch addresses:", error);
+        toast.error("Could not load your saved addresses");
+      } finally {
+        setIsLoadingAddresses(false);
+      }
+    };
+
+    fetchAddresses();
+  }, [isOpen, user]);
+
+  const getSelectedAddress = useCallback(() => {
+    if (!selectedAddressId || addresses.length === 0) return null;
+    return addresses.find(addr => addr._id === selectedAddressId);
+  }, [selectedAddressId, addresses]);
+
   const formatOrderMessage = useCallback(() => {
     // Use user.name if available, otherwise fall back to lineProfile.displayName
     const userName = user?.name || lineProfile?.displayName || "Customer";
     let message = `🛒 New Order from ${userName} 🛒\n`;
     if (orderId) message += `Order ID: ${orderId}\n\n`;
+    
+    // Add selected address if available
+    const selectedAddress = getSelectedAddress();
+    if (selectedAddress) {
+      message += `📍 Shipping Address:\n`;
+      message += `${selectedAddress.recipientName}\n`;
+      message += `${selectedAddress.street}\n`;
+      message += `${selectedAddress.city}, ${selectedAddress.state} ${selectedAddress.postalCode}\n`;
+      message += `${selectedAddress.country}\n`;
+      if (selectedAddress.phone) message += `Phone: ${selectedAddress.phone}\n`;
+      message += `\n`;
+    }
+    
     cartItems.forEach((item, index) => {
       message += `${index + 1}. ${item.name}\n`;
       message += `   ${item.quantity} x ฿${item.price.toFixed(2)} = ฿${(item.quantity * item.price).toFixed(2)}\n`;
@@ -51,9 +102,15 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
     message += "\n------------------------\n";
     message += `Subtotal: ฿${subtotal.toFixed(2)}\n`;
     message += `Total Items: ${totalItems}\n`;
-    message += "\nPlease reply with your shipping details to complete the order.";
+    
+    if (!selectedAddress) {
+      message += "\nPlease reply with your shipping details to complete the order.";
+    } else {
+      message += "\nPlease confirm your order by replying to this message.";
+    }
+    
     return message;
-  }, [cartItems, subtotal, totalItems, user, lineProfile, orderId]);
+  }, [cartItems, subtotal, totalItems, user, lineProfile, orderId, getSelectedAddress]);
 
   const copyOrderToClipboard = useCallback(() => {
     const orderMessage = formatOrderMessage();
@@ -81,12 +138,19 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
 
       const orderMessage = formatOrderMessage();
       const userName = user?.name || lineProfile?.displayName || "Customer"; // Ensure userName is included
+      const selectedAddress = getSelectedAddress();
 
       console.log("Sending order to /api/orders");
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cartItems, totalAmount: subtotal, message: orderMessage, userName }),
+        body: JSON.stringify({ 
+          cartItems, 
+          totalAmount: subtotal, 
+          message: orderMessage, 
+          userName,
+          shippingAddress: selectedAddress || null
+        }),
       });
 
       let data;
@@ -135,7 +199,7 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
     } finally {
       setIsProcessing(false);
     }
-  }, [formatOrderMessage, cartItems, subtotal, clearCart, onClose, LINE_OA_URL, LIFF_ID, isLiffInitialized, user, lineProfile]);
+  }, [formatOrderMessage, cartItems, subtotal, clearCart, onClose, LINE_OA_URL, LIFF_ID, isLiffInitialized, user, lineProfile, getSelectedAddress]);
 
   return (
     <AnimatePresence>
@@ -168,6 +232,57 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
                   </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4">
+                  {/* Address Selection Section */}
+                  {addresses.length > 0 && (
+                    <div className="mb-4">
+                      <h3 className="font-medium text-text-primary mb-2 flex items-center">
+                        <MapPin className="h-4 w-4 mr-1" />
+                        Shipping Address
+                      </h3>
+                      <div className="bg-background-secondary p-3 rounded-lg">
+                        {isLoadingAddresses ? (
+                          <div className="flex justify-center py-2">
+                            <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full" />
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <select
+                              value={selectedAddressId || ""}
+                              onChange={(e) => setSelectedAddressId(e.target.value)}
+                              className="w-full p-2 bg-background border border-border-primary rounded-md text-sm"
+                            >
+                              <option value="">-- Select an address (optional) --</option>
+                              {addresses.map((address) => (
+                                <option key={address._id} value={address._id}>
+                                  {address.recipientName} - {address.street}, {address.city}
+                                  {address.isDefault ? " (Default)" : ""}
+                                </option>
+                              ))}
+                            </select>
+                            
+                            {selectedAddressId && (
+                              <div className="text-xs text-text-secondary bg-background p-2 rounded border border-border-primary">
+                                {(() => {
+                                  const address = addresses.find(a => a._id === selectedAddressId);
+                                  if (!address) return null;
+                                  return (
+                                    <>
+                                      <p className="font-medium">{address.recipientName}</p>
+                                      <p>{address.street}</p>
+                                      <p>{address.city}, {address.state} {address.postalCode}</p>
+                                      <p>{address.country}</p>
+                                      {address.phone && <p>Phone: {address.phone}</p>}
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="mb-4">
                     <p className="text-sm text-text-secondary mb-2">
                       Your order will be sent to our LINE Official Account ({LINE_OA_ID}).{" "}
