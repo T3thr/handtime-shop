@@ -175,7 +175,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
       };
     } catch (error) {
       console.error("Image upload error:", error);
-      toast.error(`Failed to upload image: ${error.message}`);
       throw error;
     }
   };
@@ -184,59 +183,58 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
 
-    const newImageFiles = [...imageFiles, ...files];
-    setImageFiles(newImageFiles);
-    
-    // Show loading state
-    toast.info("Uploading images...", { autoClose: false, toastId: "image-upload" });
-    
+    const toastId = `image-upload-${Date.now()}`; // Unique toast ID
+    toast.info("Uploading images...", { autoClose: false, toastId });
+
     try {
+      const newImages = [];
+      const newPreviewUrls = [...imagePreviewUrls];
+
       for (const file of files) {
         // Add temporary preview
         const reader = new FileReader();
         reader.onloadend = () => {
-          setImagePreviewUrls(prev => [...prev, reader.result]);
+          newPreviewUrls.push(reader.result);
+          setImagePreviewUrls([...newPreviewUrls]);
         };
         reader.readAsDataURL(file);
 
         // Upload to Cloudinary
         const uploadedImage = await uploadImageToCloudinary(file);
-        
-        // Update form data with the new image
-        setFormData(prev => ({
-          ...prev,
-          images: [...prev.images, uploadedImage]
-        }));
+        newImages.push(uploadedImage);
       }
-      
-      // Update toast to success
-      toast.update("image-upload", { 
-        render: "Images uploaded successfully!", 
-        type: toast.TYPE.SUCCESS,
+
+      // Update form data with new images
+      setFormData(prev => ({
+        ...prev,
+        images: [...prev.images, ...newImages]
+      }));
+      setImageFiles(prev => [...prev, ...files]);
+
+      toast.update(toastId, {
+        render: "Images uploaded successfully!",
+        type: "success",
         autoClose: 3000
       });
     } catch (error) {
-      // Update toast to error
-      toast.update("image-upload", { 
-        render: "Failed to upload some images", 
-        type: toast.TYPE.ERROR,
+      console.error("Failed to upload images:", error);
+      toast.update(toastId, {
+        render: `Failed to upload images: ${error.message}`,
+        type: "error",
         autoClose: 3000
       });
     }
   };
 
   const handleRemoveImage = (index) => {
-    // Create copies of the arrays
     const newImages = [...formData.images];
     const newPreviewUrls = [...imagePreviewUrls];
     
-    // Remove the image at the specified index
     if (index < newImages.length) {
       newImages.splice(index, 1);
       setFormData(prev => ({ ...prev, images: newImages }));
     }
     
-    // Remove the preview URL
     if (index < newPreviewUrls.length) {
       newPreviewUrls.splice(index, 1);
       setImagePreviewUrls(newPreviewUrls);
@@ -272,7 +270,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
 
     setIsSubmitting(true);
     try {
-      // Ensure images array contains valid objects with URLs
       const validImages = formData.images.filter(img => img && img.url);
       
       const productData = {
@@ -294,7 +291,6 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
       setHasUnsavedChanges(false);
       localStorage.removeItem('productFormAutoSave');
       
-      // Call onSuccess callback if provided
       if (typeof onSuccess === 'function') {
         onSuccess();
       }
@@ -739,7 +735,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                     </div>
                   </div>
                 </div>
-
+                                {/*
                 <div className="md:col-span-2">
                   <h3 className="text-lg font-medium text-text-primary mb-4">SEO</h3>
                   <div className="space-y-4">
@@ -754,7 +750,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                     </div>
-                    {/*
+                    
                     <div>
                       <label className="block text-text-secondary mb-1">SEO Description</label>
                       <textarea
@@ -766,9 +762,9 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
                         className="w-full px-4 py-2 rounded-lg border border-border-primary bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                     </div>
-                    */}
-                  </div>
-                </div>
+                   
+                  </div> 
+                </div>*/}
               </div>
 
               <div className="mt-8 flex justify-end space-x-4">
@@ -812,6 +808,7 @@ export const ProductFormModal = ({ isOpen, onClose, product = null, categories =
 
 export const CategoryFormModal = ({ isOpen, onClose, category = null, onSuccess }) => {
   const [formData, setFormData] = useState({
+    _id: "",
     name: "",
     slug: "",
     description: "",
@@ -844,6 +841,7 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, onSuccess 
   useEffect(() => {
     if (category) {
       const initialData = {
+        _id: category._id || "",
         name: category.name || "",
         slug: category.slug || "",
         description: category.description || "",
@@ -855,6 +853,7 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, onSuccess 
       setImagePreview(category.image?.url || "");
     } else {
       const initialData = {
+        _id: "",
         name: "",
         slug: "",
         description: "",
@@ -924,7 +923,6 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, onSuccess 
       };
     } catch (error) {
       console.error("Image upload error:", error);
-      toast.error(`Failed to upload image: ${error.message}`);
       throw error;
     }
   };
@@ -933,32 +931,27 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, onSuccess 
     const file = e.target.files[0];
     if (!file) return;
 
-    // Show temporary preview
-    const reader = new FileReader();
-    reader.onloadend = () => setImagePreview(reader.result);
-    reader.readAsDataURL(file);
-
-    // Show loading state
-    toast.info("Uploading image...", { autoClose: false, toastId: "category-image-upload" });
+    const toastId = `category-image-upload-${Date.now()}`;
+    toast.info("Uploading image...", { autoClose: false, toastId });
 
     try {
+      const reader = new FileReader();
+      reader.onloadend = () => setImagePreview(reader.result);
+      reader.readAsDataURL(file);
+
       const uploadedImage = await uploadImageToCloudinary(file);
       setFormData(prev => ({ ...prev, image: uploadedImage }));
       
-      // Update toast to success
-      toast.update("category-image-upload", { 
+      toast.update(toastId, { 
         render: "Image uploaded successfully!", 
-        type: toast.TYPE.SUCCESS,
+        type: "success",
         autoClose: 3000
       });
     } catch (error) {
-      // Revert to previous image if upload fails
       setImagePreview(formData.image.url || "");
-      
-      // Update toast to error
-      toast.update("category-image-upload", { 
-        render: "Failed to upload image", 
-        type: toast.TYPE.ERROR,
+      toast.update(toastId, { 
+        render: `Failed to upload image: ${error.message}`, 
+        type: "error",
         autoClose: 3000
       });
     }
@@ -990,18 +983,18 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, onSuccess 
 
     setIsSubmitting(true);
     try {
-      // Ensure image is properly formatted
       const categoryData = {
         ...formData,
         image: formData.image && formData.image.url ? formData.image : null
       };
 
       if (category) {
-        await updateCategory(categoryData);
+        await updateCategory(categoryData); // Pass the full categoryData with _id
       } else {
         await addCategory(categoryData);
         setImagePreview("");
         setFormData({
+          _id: "",
           name: "",
           slug: "",
           description: "",
@@ -1013,7 +1006,6 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, onSuccess 
       setHasUnsavedChanges(false);
       localStorage.removeItem('categoryFormAutoSave');
       
-      // Call onSuccess callback if provided
       if (typeof onSuccess === 'function') {
         onSuccess();
       }
@@ -1021,7 +1013,7 @@ export const CategoryFormModal = ({ isOpen, onClose, category = null, onSuccess 
       onClose();
     } catch (error) {
       console.error("Error saving category:", error);
-      toast.error(error.message || "Failed to save category.");
+      toast.error(error.message || "Failed to save category. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
