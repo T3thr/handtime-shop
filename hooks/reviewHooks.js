@@ -194,8 +194,6 @@ export const submitReview = async (reviewData) => {
     throw new Error('Rating must be between 1 and 5');
   }
 
-  console.log('Submitting review data:', reviewData);
-
   try {
     const response = await axios.post('/api/review', reviewData);
     toast.success('Review submitted successfully!');
@@ -251,7 +249,7 @@ export const updateReview = async (reviewId, reviewData) => {
   }
 };
 
-export const deleteReview = async (reviewId) => {
+export const deleteReview = async (reviewId, mutate) => {
   const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(id);
 
   if (!reviewId || !isValidObjectId(reviewId)) {
@@ -260,7 +258,13 @@ export const deleteReview = async (reviewId) => {
 
   try {
     await axios.delete(`/api/admin/reviews?reviewId=${reviewId}`);
-    toast.success('Review deleted successfully!');
+    
+    // Invalidate caches for reviews and products if mutate is provided
+    if (mutate) {
+      mutate((key) => typeof key === 'string' && key.startsWith('/api/admin/reviews'), undefined, { revalidate: true });
+      mutate('/api/products', undefined, { revalidate: true });
+    }
+
     return true;
   } catch (error) {
     console.error('Error deleting review:', error);
@@ -278,12 +282,11 @@ export const deleteReview = async (reviewId) => {
       message = 'Server error, please try again later';
     }
 
-    toast.error(message);
     throw new Error(message);
   }
 };
 
-export const updateReviewStatus = async (reviewId, status) => {
+export const updateReviewStatus = async (reviewId, status, mutate) => {
   const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(id);
 
   if (!reviewId || !isValidObjectId(reviewId)) {
@@ -295,10 +298,13 @@ export const updateReviewStatus = async (reviewId, status) => {
 
   try {
     const response = await axios.put(`/api/admin/reviews?reviewId=${reviewId}`, { status });
-    toast.success('Review status updated successfully!');
-    // Trigger refetch of products to update averageRating
-    const { mutate: refetchProducts } = require('swr').useSWRConfig();
-    refetchProducts('/api/products');
+
+    // Invalidate caches for reviews and products if mutate is provided
+    if (mutate) {
+      mutate((key) => typeof key === 'string' && key.startsWith('/api/admin/reviews'), undefined, { revalidate: true });
+      mutate('/api/products', undefined, { revalidate: true });
+    }
+
     return response.data;
   } catch (error) {
     console.error('Error updating review status:', error);
@@ -316,7 +322,6 @@ export const updateReviewStatus = async (reviewId, status) => {
       message = 'Server error, please try again later';
     }
 
-    toast.error(message);
     throw new Error(message);
   }
 };

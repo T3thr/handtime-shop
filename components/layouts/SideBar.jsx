@@ -1,4 +1,3 @@
-// components/layouts/SideBar.jsx
 "use client";
 import React, { useState, useCallback, useContext, useEffect } from "react";
 import Link from "next/link";
@@ -36,6 +35,14 @@ export default function SideBar() {
   const { user, lineProfile, lineSignIn, adminSignIn, logoutUser, status } = useContext(AuthContext);
   const router = useRouter();
 
+  // State for touch swipe detection
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
+
+  // Swipe detection constants
+  const SWIPE_EDGE_THRESHOLD = 100; // Pixels from left edge to start swipe
+  const SWIPE_DISTANCE_THRESHOLD = 100; // Minimum swipe distance to trigger
+
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -58,6 +65,55 @@ export default function SideBar() {
     document.addEventListener("openSidebar", handleOpenSidebar);
     return () => document.removeEventListener("openSidebar", handleOpenSidebar);
   }, [openSidebar]);
+
+  // Touch event handlers for swipe detection
+  const handleTouchStart = useCallback((e) => {
+    const touch = e.touches[0];
+    setTouchStart({ x: touch.clientX, y: touch.clientY });
+    setTouchEnd(null); // Reset touch end
+  }, []);
+
+  const handleTouchMove = useCallback((e) => {
+    const touch = e.touches[0];
+    setTouchEnd({ x: touch.clientX, y: touch.clientY });
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!touchStart || !touchEnd) return;
+
+    const deltaX = touchEnd.x - touchStart.x;
+    const deltaY = touchEnd.y - touchStart.y;
+
+    // Check if swipe starts near left edge and is primarily horizontal
+    if (
+      touchStart.x < SWIPE_EDGE_THRESHOLD &&
+      deltaX > SWIPE_DISTANCE_THRESHOLD &&
+      Math.abs(deltaY) < Math.abs(deltaX)
+    ) {
+      openSidebar();
+    }
+
+    // Reset touch state
+    setTouchStart(null);
+    setTouchEnd(null);
+  }, [touchStart, touchEnd, openSidebar]);
+
+  useEffect(() => {
+    // Only add touch listeners on touch-enabled devices
+    if ("ontouchstart" in window) {
+      window.addEventListener("touchstart", handleTouchStart);
+      window.addEventListener("touchmove", handleTouchMove);
+      window.addEventListener("touchend", handleTouchEnd);
+    }
+
+    return () => {
+      if ("ontouchstart" in window) {
+        window.removeEventListener("touchstart", handleTouchStart);
+        window.removeEventListener("touchmove", handleTouchMove);
+        window.removeEventListener("touchend", handleTouchEnd);
+      }
+    };
+  }, [handleTouchStart, handleTouchMove, handleTouchEnd]);
 
   const handleLineSignIn = useCallback(async () => {
     setIsLineLoading(true);
@@ -193,7 +249,7 @@ export default function SideBar() {
   const handleGuestClick = () => {
     if (!isAuthenticated) {
       setShowSigninGuide(true);
-      toast.info("Please sign in to access your wishlist!", { autoClose: 3000 }); // Updated message
+      toast.info("Please sign in to access your wishlist!", { autoClose: 3000 });
       setTimeout(() => setShowSigninGuide(false), 3000);
     } else {
       closeSidebar();
@@ -350,7 +406,7 @@ export default function SideBar() {
                           <span className="text-foreground">Account Settings</span>
                         </div>
                         <ChevronRight className="h-4 w-4 text-text-tertiary group-hover:text-primary" />
-                      </button>
+                        </button>
                     )}
                   </div>
                 </div>

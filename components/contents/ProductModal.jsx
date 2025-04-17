@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef, useContext } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { useCart } from "@/context/CartContext";
@@ -13,26 +13,26 @@ import { useReviews } from "@/hooks/reviewHooks";
 import { useSwipeable } from "react-swipeable";
 
 export default function ProductModal({ product: initialProduct, onClose, keyword = "" }) {
-  const { addToCart, cartItems, getCartSummary, fetchProductDetails, productCache } = useCart();
+  const { addToCart, cartItems, productCache, fetchProductDetails } = useCart();
   const { status } = useContext(AuthContext);
   const isAuthenticated = status === "authenticated";
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [product, setProduct] = useState(initialProduct);
   const { openSidebar } = useSidebar();
   const [activeTab, setActiveTab] = useState("description");
-  const { reviews, averageRating, ratingCounts, isLoading: reviewsLoading, pagination, changePage, total: reviewsTotal } = useReviews(initialProduct._id);
+  const { reviews, averageRating, ratingCounts, isLoading: reviewsLoading, pagination, changePage, reviewCount } = useReviews(initialProduct._id);
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Swipe handlers for mobile
   const swipeHandlers = useSwipeable({
     onSwipedLeft: () => {
-      if (window.innerWidth <= 640) { // Only on mobile
+      if (window.innerWidth <= 640) {
         onClose();
       }
     },
     trackMouse: false,
-    delta: 50, // Minimum swipe distance
+    delta: 50,
   });
 
   useEffect(() => {
@@ -160,7 +160,6 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
 
   const isInCart = cartItems.some((item) => item.productId === product._id);
   const images = product.images?.length > 0 ? product.images : [{ url: "/images/placeholder.jpg" }];
-  const primaryImageIndex = images.findIndex((img) => img.isPrimary) || 0;
   const currentImage = images[currentImageIndex];
 
   const handleNextImage = () => {
@@ -190,7 +189,7 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
   };
 
   const getPercentage = (count) => {
-    return reviewsTotal > 0 ? Math.round((count / reviewsTotal) * 100) : 0;
+    return reviewCount > 0 ? Math.round((count / reviewCount) * 100) : 0;
   };
 
   if (loading) {
@@ -312,7 +311,7 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
 
                     <div className="flex items-center text-sm text-text-muted">
                       {renderStars(averageRating || 0)}
-                      <span className="ml-2">({product.reviewCount || 0})</span>
+                      <span className="ml-2">({reviewCount || 0})</span>
                     </div>
                   </div>
 
@@ -344,7 +343,7 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
                               : "border-transparent text-text-secondary hover:text-text-primary"
                           }`}
                         >
-                          {tab === "reviews" ? `Reviews (${product.reviewCount || 0})` : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                          {tab === "reviews" ? `Reviews (${reviewCount || 0})` : tab.charAt(0).toUpperCase() + tab.slice(1)}
                         </button>
                       ))}
                     </div>
@@ -441,7 +440,7 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
                               {reviewsLoading ? (
                                 <div className="w-24 h-4 bg-gray-200 animate-pulse rounded" />
                               ) : (
-                                `${reviewsTotal || 0} ${reviewsTotal === 1 ? "review" : "reviews"}`
+                                `${reviewCount || 0} ${reviewCount === 1 ? "review" : "reviews"}`
                               )}
                             </div>
                           </div>
@@ -523,7 +522,7 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
                                     <div className="w-12 h-12 rounded-full bg-background-secondary flex items-center justify-center mr-3 overflow-hidden">
                                       {review.userId?.avatar ? (
                                         <Image
-                                          src={review.userId.avatar}
+                                          src={review.userId.avatar || "/images/avatar-placeholder.jpg"}
                                           alt={review.userId.name || "User"}
                                           width={48}
                                           height={48}
@@ -558,7 +557,7 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
                                         className="relative w-20 h-20 rounded-lg overflow-hidden"
                                       >
                                         <Image
-                                          src={image}
+                                          src={image || "/images/placeholder.jpg"}
                                           alt={`Review image ${index + 1}`}
                                           fill
                                           className="object-cover"

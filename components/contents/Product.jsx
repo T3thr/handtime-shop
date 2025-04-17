@@ -959,7 +959,7 @@ export default function Product() {
                             {productsLoading
                               ? ""
                               : product.averageRating
-                              ? `(${product.averageRating.toFixed(1)}) ${product.reviewCount} reviews`
+                              ? `(${product.averageRating.toFixed(1)})`
                               : "(0)"}
                           </span>
                         </div>

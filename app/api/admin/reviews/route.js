@@ -35,8 +35,25 @@ export async function GET(request) {
       .populate('productId', 'name images')
       .lean();
     
+    // Ensure valid avatar and image URLs
+    const serializedReviews = reviews.map(review => ({
+      ...review,
+      userId: review.userId ? {
+        ...review.userId,
+        avatar: review.userId.avatar || '/images/avatar-placeholder.jpg'
+      } : null,
+      productId: review.productId ? {
+        ...review.productId,
+        images: Array.isArray(review.productId.images) ? review.productId.images.map(img => ({
+          ...img,
+          url: img.url || '/images/placeholder.jpg'
+        })) : []
+      } : null,
+      images: Array.isArray(review.images) ? review.images.map(img => img || '/images/placeholder.jpg') : []
+    }));
+
     return NextResponse.json({
-      reviews,
+      reviews: serializedReviews,
       page,
       limit,
       total,
@@ -59,13 +76,13 @@ export async function PUT(request) {
     
     const { searchParams } = new URL(request.url);
     const reviewId = searchParams.get('reviewId');
-    const data = await request.json();
+    const { status } = await request.json();
     
     if (!reviewId || !mongoose.Types.ObjectId.isValid(reviewId)) {
       return NextResponse.json({ error: "Invalid review ID" }, { status: 400 });
     }
     
-    if (!data.status || !['show', 'hide'].includes(data.status)) {
+    if (!status || !['show', 'hide'].includes(status)) {
       return NextResponse.json({ error: "Invalid status. Must be 'show' or 'hide'" }, { status: 400 });
     }
     
@@ -74,7 +91,7 @@ export async function PUT(request) {
       return NextResponse.json({ error: "Review not found" }, { status: 404 });
     }
     
-    review.status = data.status;
+    review.status = status;
     await review.save();
     
     // Update product's average rating and review count
@@ -88,11 +105,14 @@ export async function PUT(request) {
       await product.save();
     }
     
-    return NextResponse.json({ 
+    // Set cache-control headers to prevent caching on Vercel
+    const response = NextResponse.json({ 
       success: true,
       review,
       message: "Review status updated successfully"
     });
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    return response;
   } catch (error) {
     console.error("Failed to update review status:", error);
     return NextResponse.json({ 
@@ -136,10 +156,13 @@ export async function DELETE(request) {
       await product.save();
     }
     
-    return NextResponse.json({ 
+    // Set cache-control headers
+    const response = NextResponse.json({ 
       success: true,
       message: "Review deleted successfully"
     });
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    return response;
   } catch (error) {
     console.error("Failed to delete review:", error);
     return NextResponse.json({ 

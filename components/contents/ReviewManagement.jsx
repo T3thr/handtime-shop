@@ -13,8 +13,24 @@ export const ReviewManagement = () => {
 
   const handleUpdateStatus = async (reviewId, newStatus) => {
     try {
-      await updateReviewStatus(reviewId, newStatus);
-      refetch();
+      // Optimistically update the review status in the UI
+      const previousReviews = reviews;
+      const updatedReviews = reviews.map((review) =>
+        review._id === reviewId ? { ...review, status: newStatus } : review
+      );
+
+      // Update the SWR cache optimistically
+      refetch(
+        async () => {
+          await updateReviewStatus(reviewId, newStatus, refetch);
+          return { reviews: updatedReviews, page: pagination.page, limit: pagination.limit, total: pagination.total, totalPages: pagination.totalPages };
+        },
+        {
+          optimisticData: { reviews: updatedReviews, page: pagination.page, limit: pagination.limit, total: pagination.total, totalPages: pagination.totalPages },
+          rollbackOnError: true,
+        }
+      );
+
       toast.success(`Review status updated to ${newStatus}`);
     } catch (error) {
       console.error("Failed to update review status:", error);
@@ -23,9 +39,25 @@ export const ReviewManagement = () => {
   };
 
   const handleDeleteReview = async (reviewId) => {
+    if (!confirm("Are you sure you want to delete this review?")) return;
+
     try {
-      await deleteReview(reviewId);
-      refetch();
+      // Optimistically remove the review from the UI
+      const previousReviews = reviews;
+      const updatedReviews = reviews.filter((review) => review._id !== reviewId);
+
+      // Update the SWR cache optimistically
+      refetch(
+        async () => {
+          await deleteReview(reviewId, refetch);
+          return { reviews: updatedReviews, page: pagination.page, limit: pagination.limit, total: pagination.total - 1, totalPages: Math.ceil((pagination.total - 1) / pagination.limit) };
+        },
+        {
+          optimisticData: { reviews: updatedReviews, page: pagination.page, limit: pagination.limit, total: pagination.total - 1, totalPages: Math.ceil((pagination.total - 1) / pagination.limit) },
+          rollbackOnError: true,
+        }
+      );
+
       toast.success("Review deleted successfully");
     } catch (error) {
       console.error("Failed to delete review:", error);
@@ -102,7 +134,7 @@ export const ReviewManagement = () => {
             <div className="flex mt-1 space-x-1">
               {row.images.slice(0, 3).map((image, idx) => (
                 <div key={idx} className="h-6 w-6 relative rounded overflow-hidden">
-                  <Image src={image} alt={`Review image ${idx + 1}`} fill className="object-cover" />
+                  <Image src={image || "/images/placeholder.jpg"} alt={`Review image ${idx + 1}`} fill className="object-cover" />
                 </div>
               ))}
               {row.images.length > 3 && (

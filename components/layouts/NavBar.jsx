@@ -41,10 +41,10 @@ export default function NavBar({ children }) {
             <div className="flex items-center">
               <button
                 onClick={openSidebar}
-                className="p-2 hover:bg-primary bg-primary-10 rounded-full transition-all duration-300 shadow-md hover:scale-105"
+                className="p-2 hover:bg-primary bg-primary-10 border border-background rounded-full transition-all duration-300 shadow-md hover:scale-105"
                 aria-label="Open menu"
               >
-                <BsPersonLinesFill className="h-6 w-6 text-foreground group-hover:text-white transition-colors" />
+                <BsPersonLinesFill className="h-6 w-6 text-foreground group-hover:text-white  transition-colors" />
               </button>
 
               <Link href="/" className="ml-4 flex-shrink-0" aria-label="Home">

@@ -617,8 +617,24 @@ export const ReviewsManagement = () => {
 
   const handleUpdateStatus = async (reviewId, newStatus) => {
     try {
-      await updateReviewStatus(reviewId, newStatus);
-      refetchReviews();
+      // Optimistically update the review status in the UI
+      const previousReviews = reviews;
+      const updatedReviews = reviews.map((review) =>
+        review._id === reviewId ? { ...review, status: newStatus } : review
+      );
+
+      // Update the SWR cache optimistically
+      refetchReviews(
+        async () => {
+          await updateReviewStatus(reviewId, newStatus);
+          return { ...reviews, reviews: updatedReviews };
+        },
+        {
+          optimisticData: { reviews: updatedReviews, page: pagination.page, limit: pagination.limit, total: pagination.total, totalPages: pagination.totalPages },
+          rollbackOnError: true,
+        }
+      );
+
       toast.success(`Review status updated to ${newStatus}`);
     } catch (error) {
       console.error('Failed to update review status:', error);
@@ -632,6 +648,7 @@ export const ReviewsManagement = () => {
     try {
       await deleteReview(reviewId);
       refetchReviews();
+      toast.success('Review deleted successfully');
     } catch (error) {
       console.error('Failed to delete review:', error);
       toast.error('Failed to delete review');
@@ -707,7 +724,7 @@ export const ReviewsManagement = () => {
             <div className="flex mt-1 space-x-1">
               {row.images.slice(0, 3).map((image, idx) => (
                 <div key={idx} className="h-6 w-6 relative rounded overflow-hidden">
-                  <Image src={image} alt={`Review image ${idx + 1}`} fill className="object-cover" />
+                  <Image src={image || '/images/placeholder.jpg'} alt={`Review image ${idx + 1}`} fill className="object-cover" />
                 </div>
               ))}
               {row.images.length > 3 && (
