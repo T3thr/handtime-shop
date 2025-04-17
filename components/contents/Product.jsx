@@ -639,14 +639,14 @@ export default function Product() {
                   onChange={(e) => setFilters((prev) => ({ ...prev, searchQuery: e.target.value }))}
                   className="pl-9 pr-3 py-2 bg-container text-foreground rounded-full border border-border-primary bg-surface-card/80 focus:outline-none focus:ring-2 focus:ring-primary text-sm w-full sm:w-64 transition-all duration-300 focus:w-72"
                 />
-                <Search className="absolute left-3 top-1/2 transform -translate Y-1/2 h-4 w-4 text-text-muted group-hover:text-primary transition-colors duration-200" />
+                <Search className="absolute left-3 bottom-1/3 transform -translate Y-1/2 h-4 w-4 text-text-muted group-hover:text-primary transition-colors duration-200" />
                 {filters.searchQuery && (
                   <motion.button
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.8, opacity: 0 }}
                     onClick={() => setFilters((prev) => ({ ...prev, searchQuery: "" }))}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                    className="absolute right-3 bottom-1/3 transform -translate-y-1/2"
                   >
                     <X className="h-4 w-4 text-text-muted hover:text-error transition-colors duration-200" />
                   </motion.button>

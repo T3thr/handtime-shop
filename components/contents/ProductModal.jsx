@@ -300,7 +300,7 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
 
                     <div className="flex items-center text-sm text-text-muted">
                       {renderStars(averageRating || 0)}
-                      <span className="ml-2">({reviewsTotal || 0})</span>
+                      <span className="ml-2">({product.reviewCount || 0})</span>
                     </div>
                   </div>
 
