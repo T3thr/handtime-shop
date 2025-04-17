@@ -175,13 +175,7 @@ const UserSchema = new Schema(
       default: 'user',
     },
     avatar: {
-      type: String,
-      validate: {
-        validator: function (v) {
-          return v === null || /^(https?:\/\/).+\.(jpg|jpeg|png|webp|gif)$/i.test(v);
-        },
-        message: (props) => `${props.value} is not a valid image URL!`,
-      },
+      type: String,   
       default: null,
     },
     cart: [CartItemSchema],
