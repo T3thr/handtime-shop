@@ -48,7 +48,7 @@ export default function Product() {
     priceRange: "",
     sortBy: "",
     searchQuery: "",
-    inStockOnly: false, // New filter for in-stock products
+    inStockOnly: false,
   });
   const [categories, setCategories] = useState([]);
   const [mainCategories, setMainCategories] = useState([]);
@@ -110,7 +110,11 @@ export default function Product() {
     const handleOpenProductModal = (e) => {
       const { id, keyword } = e.detail;
       const product = products?.find((p) => p._id === id);
-      if (product) setSelectedProduct({ ...product, keyword });
+      if (product) {
+        setSelectedProduct({ ...product, keyword });
+        // Update URL to product slug
+        window.history.pushState({}, '', `/product/${product.slug}`);
+      }
     };
 
     const handleOpenLearnMoreModal = (e) => {
@@ -119,12 +123,21 @@ export default function Product() {
       setHighlightedSection({ section, keyword });
     };
 
+    // Handle browser back/forward navigation
+    const handlePopState = () => {
+      if (!window.location.pathname.startsWith('/product/')) {
+        setSelectedProduct(null);
+      }
+    };
+
     document.addEventListener("openProductModal", handleOpenProductModal);
     document.addEventListener("openLearnMoreModal", handleOpenLearnMoreModal);
+    window.addEventListener('popstate', handlePopState);
 
     return () => {
       document.removeEventListener("openProductModal", handleOpenProductModal);
       document.removeEventListener("openLearnMoreModal", handleOpenLearnMoreModal);
+      window.removeEventListener('popstate', handlePopState);
     };
   }, [products]);
 
@@ -259,6 +272,8 @@ export default function Product() {
       reviewCount: reviewData.reviewCount,
       reviews: reviewData.reviews
     });
+    // Update URL to product slug
+    window.history.pushState({}, '', `/product/${product.slug}`);
   };
 
   const isProductInCart = (productId) => {
@@ -639,14 +654,14 @@ export default function Product() {
                   onChange={(e) => setFilters((prev) => ({ ...prev, searchQuery: e.target.value }))}
                   className="pl-9 pr-3 py-2 bg-container text-foreground rounded-full border border-border-primary bg-surface-card/80 focus:outline-none focus:ring-2 focus:ring-primary text-sm w-full sm:w-64 transition-all duration-300 focus:w-72"
                 />
-                <Search className="absolute left-3 bottom-1/3 transform -translate Y-1/2 h-4 w-4 text-text-muted group-hover:text-primary transition-colors duration-200" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-text-muted group-hover:text-primary transition-colors duration-200" />
                 {filters.searchQuery && (
                   <motion.button
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.8, opacity: 0 }}
                     onClick={() => setFilters((prev) => ({ ...prev, searchQuery: "" }))}
-                    className="absolute right-3 bottom-1/3 transform -translate-y-1/2"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
                   >
                     <X className="h-4 w-4 text-text-muted hover:text-error transition-colors duration-200" />
                   </motion.button>
@@ -880,14 +895,12 @@ export default function Product() {
                       variants={fadeInUp}
                       transition={{ duration: 0.3, delay: index * 0.05 }}
                       whileHover={{ y: -5 }}
-                      className={`group relative bg-surface-card rounded-xl shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md ${
+                      onClick={() => handleProductClick(product)}
+                      className={`group relative bg-surface-card rounded-xl shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md cursor-pointer ${
                         isOutOfStock ? "opacity-60" : ""
                       }`}
                     >
-                      <div
-                        className="aspect-square relative overflow-hidden cursor-pointer"
-                        onClick={() => handleProductClick(product)}
-                      >
+                      <div className="aspect-square relative overflow-hidden">
                         <Image
                           src={product.images[0]?.url || "/images/placeholder.jpg"}
                           alt={product.name}
@@ -920,24 +933,23 @@ export default function Product() {
                         )}
                       </div>
 
-                      <div className="p-5">
+                      <div className="p-4 sm:p-5">
                         <div className="flex justify-between items-start mb-2">
                           <h3
-                            className="font-medium text-text-primary line-clamp-1 cursor-pointer"
-                            onClick={() => handleProductClick(product)}
+                            className="font-medium text-base sm:text-lg text-text-primary line-clamp-1"
                             data-search-term={product.name.toLowerCase()}
                           >
                             {product.name}
                           </h3>
-                          <span className="font-bold text-primary">฿{product.price.toFixed(2)}</span>
+                          <span className="font-bold text-primary text-base sm:text-lg">฿{product.price.toFixed(2)}</span>
                         </div>
                         <p
-                          className="text-sm text-text-muted line-clamp-2 mb-2 min-h-[40px]"
+                          className="text-xs sm:text-sm text-text-muted line-clamp-2 mb-2 min-h-[2.5rem] sm:min-h-[3rem]"
                           data-search-term={product.shortDescription?.toLowerCase() || product.description.toLowerCase()}
                         >
                           {product.shortDescription || product.description}
                         </p>
-                        <div className="flex items-center mb-4">
+                        <div className="flex items-center mb-3 sm:mb-4">
                           {renderStars(product.averageRating || 0, productsLoading)}
                           <span className="ml-2 text-xs text-text-secondary">
                             {productsLoading
@@ -953,7 +965,7 @@ export default function Product() {
                           whileTap={{ scale: isOutOfStock ? 1 : 0.95 }}
                           onClick={(e) => handleAddToCart(product, e)}
                           disabled={isOutOfStock}
-                          className={`w-full flex items-center justify-center px-4 py-2 rounded-full transition-colors duration-200 relative overflow-hidden ${
+                          className={`w-full flex items-center justify-center px-4 py-2 rounded-full transition-colors duration-200 relative overflow-hidden text-sm sm:text-base ${
                             isProductInCart(product._id)
                               ? "bg-primary-dark text-text-inverted"
                               : isOutOfStock
@@ -994,7 +1006,7 @@ export default function Product() {
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
                     onClick={() => setVisibleProducts((prev) => prev + 8)}
-                    className="btn-primary bg-surface-card hover:bg-surface-card/80 border border-border-primary inline-flex items-center text-text-secondary"
+                    className="btn-primary bg-surface-card hover:bg-surface-card/80 border border-border-primary inline-flex items-center text-text-secondary text-sm sm:text-base"
                   >
                     Load More
                     <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1012,7 +1024,11 @@ export default function Product() {
               {selectedProduct && (
                 <ProductModal
                   product={selectedProduct}
-                  onClose={() => setSelectedProduct(null)}
+                  onClose={() => {
+                    setSelectedProduct(null);
+                    // Restore homepage URL
+                    window.history.pushState({}, '', '/');
+                  }}
                   keyword={selectedProduct.keyword}
                 />
               )}

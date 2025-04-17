@@ -10,6 +10,7 @@ import axios from "axios";
 import AuthContext from "@/context/AuthContext";
 import { useSidebar } from "@/context/SidebarContext";
 import { useReviews } from "@/hooks/reviewHooks";
+import { useSwipeable } from "react-swipeable";
 
 export default function ProductModal({ product: initialProduct, onClose, keyword = "" }) {
   const { addToCart, cartItems, getCartSummary, fetchProductDetails, productCache } = useCart();
@@ -22,6 +23,17 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
   const { reviews, averageRating, ratingCounts, isLoading: reviewsLoading, pagination, changePage, total: reviewsTotal } = useReviews(initialProduct._id);
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Swipe handlers for mobile
+  const swipeHandlers = useSwipeable({
+    onSwipedLeft: () => {
+      if (window.innerWidth <= 640) { // Only on mobile
+        onClose();
+      }
+    },
+    trackMouse: false,
+    delta: 50, // Minimum swipe distance
+  });
 
   useEffect(() => {
     const loadProductDetails = async () => {
@@ -200,7 +212,7 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
           onClick={onClose}
         />
 
-        <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
+        <div className="flex min-h-full items-center justify-center p-4 sm:p-6" {...swipeHandlers}>
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
