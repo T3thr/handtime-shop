@@ -1,4 +1,3 @@
-// components/layouts/LineCheckoutModal.jsx
 "use client";
 import React, { useState, useCallback, useContext, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,7 +11,7 @@ import axios from "axios";
 
 const LineCheckoutModal = ({ isOpen, onClose }) => {
   const { cartItems, getCartSummary, clearCart } = useCart();
-  const { user, lineProfile } = useContext(AuthContext); // Added user from AuthContext
+  const { user, lineProfile } = useContext(AuthContext);
   const { subtotal, totalItems } = getCartSummary();
   const [isProcessing, setIsProcessing] = useState(false);
   const [showThankYou, setShowThankYou] = useState(false);
@@ -27,6 +26,7 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
   const LIFF_ID = process.env.NEXT_PUBLIC_LIFF_ID;
   const LINE_OA_URL = `https://line.me/R/ti/p/${LINE_OA_ID.startsWith('@') ? LINE_OA_ID : `@${LINE_OA_ID}`}`;
 
+  // Initialize LIFF when modal opens
   useEffect(() => {
     const initializeLiff = async () => {
       try {
@@ -47,15 +47,15 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
   useEffect(() => {
     const fetchAddresses = async () => {
       if (!isOpen || !user) return;
-      
+
       setIsLoadingAddresses(true);
       try {
         const response = await axios.get("/api/user/address");
         const addressData = response.data.addresses || [];
         setAddresses(addressData);
-        
+
         // Set default address as selected if available
-        const defaultAddress = addressData.find(addr => addr.isDefault);
+        const defaultAddress = addressData.find((addr) => addr.isDefault);
         if (defaultAddress) {
           setSelectedAddressId(defaultAddress._id);
         } else if (addressData.length > 0) {
@@ -72,17 +72,18 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
     fetchAddresses();
   }, [isOpen, user]);
 
+  // Get the selected address
   const getSelectedAddress = useCallback(() => {
     if (!selectedAddressId || addresses.length === 0) return null;
-    return addresses.find(addr => addr._id === selectedAddressId);
+    return addresses.find((addr) => addr._id === selectedAddressId);
   }, [selectedAddressId, addresses]);
 
+  // Format the order message with address
   const formatOrderMessage = useCallback(() => {
-    // Use user.name if available, otherwise fall back to lineProfile.displayName
     const userName = user?.name || lineProfile?.displayName || "Customer";
     let message = `🛒 New Order from ${userName} 🛒\n`;
     if (orderId) message += `Order ID: ${orderId}\n\n`;
-    
+
     // Add selected address if available
     const selectedAddress = getSelectedAddress();
     if (selectedAddress) {
@@ -94,7 +95,8 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
       if (selectedAddress.phone) message += `Phone: ${selectedAddress.phone}\n`;
       message += `\n`;
     }
-    
+
+    // Add order items
     cartItems.forEach((item, index) => {
       message += `${index + 1}. ${item.name}\n`;
       message += `   ${item.quantity} x ฿${item.price.toFixed(2)} = ฿${(item.quantity * item.price).toFixed(2)}\n`;
@@ -102,32 +104,38 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
     message += "\n------------------------\n";
     message += `Subtotal: ฿${subtotal.toFixed(2)}\n`;
     message += `Total Items: ${totalItems}\n`;
-    
+
     if (!selectedAddress) {
       message += "\nPlease reply with your shipping details to complete the order.";
     } else {
-      message += "\nPlease confirm your order by replying to this message.";
+      message += "\nPlease confirm the order and address by replying to this message.";
     }
-    
+
     return message;
   }, [cartItems, subtotal, totalItems, user, lineProfile, orderId, getSelectedAddress]);
 
+  // Copy order message to clipboard
   const copyOrderToClipboard = useCallback(() => {
     const orderMessage = formatOrderMessage();
-    navigator.clipboard.writeText(orderMessage)
-      .then(() => toast.success("Order copied to clipboard! Paste it in LINE chat"))
+    navigator.clipboard
+      .writeText(orderMessage)
+      .then(() => toast.success("Order details copied to clipboard! Paste it in LINE chat"))
       .catch((err) => {
         console.error("Failed to copy text:", err);
         toast.error("Could not copy to clipboard");
       });
   }, [formatOrderMessage]);
 
+  // Handle LINE checkout process
   const handleLineCheckout = useCallback(async () => {
     setIsProcessing(true);
 
     try {
       if (!LIFF_ID) throw new Error("LIFF ID is not set in environment variables");
-      if (!isLiffInitialized) await liff.init({ liffId: LIFF_ID });
+      if (!isLiffInitialized) {
+        await liff.init({ liffId: LIFF_ID });
+        setIsLiffInitialized(true);
+      }
 
       if (!liff.isLoggedIn()) {
         console.log("User not logged in, initiating LINE login");
@@ -137,20 +145,36 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
       }
 
       const orderMessage = formatOrderMessage();
-      const userName = user?.name || lineProfile?.displayName || "Customer"; // Ensure userName is included
+      const userName = user?.name || lineProfile?.displayName || "Customer";
       const selectedAddress = getSelectedAddress();
 
-      console.log("Sending order to /api/orders");
+      // Prepare order data for API
+      const orderData = {
+        cartItems,
+        totalAmount: subtotal,
+        message: orderMessage,
+        userName,
+        shippingAddress: selectedAddress
+          ? {
+              recipientName: selectedAddress.recipientName,
+              street: selectedAddress.street,
+              city: selectedAddress.city,
+              state: selectedAddress.state,
+              postalCode: selectedAddress.postalCode,
+              country: selectedAddress.country,
+              phone: selectedAddress.phone || "",
+              _id: selectedAddress._id,
+            }
+          : null,
+      };
+
+      console.log("Sending order to /api/orders with data:", orderData);
+
+      // Send order to backend
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          cartItems, 
-          totalAmount: subtotal, 
-          message: orderMessage, 
-          userName,
-          shippingAddress: selectedAddress || null
-        }),
+        body: JSON.stringify(orderData),
       });
 
       let data;
@@ -162,9 +186,12 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
         throw new Error(`Server returned invalid JSON: ${text.slice(0, 100)}...`);
       }
 
-      if (!response.ok) throw new Error(data.error || data.details || "Unknown error from server");
+      if (!response.ok) {
+        console.error("API error response:", data);
+        throw new Error(data.error || data.details || "Unknown error from server");
+      }
 
-      console.log("API response:", data);
+      console.log("Order API response:", data);
       setOrderId(data.orderId);
       clearCart();
       setOrderProcessed(true);
@@ -174,18 +201,30 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
         console.warn("Warning from API:", data.warning);
       }
 
+      // Copy order message to clipboard
       await navigator.clipboard.writeText(orderMessage);
-      toast.success("Order message copied to clipboard! Opening LINE...");
+      toast.success("Order details copied to clipboard! Opening LINE...");
 
+      // Attempt to send message directly via LIFF
       try {
         if (liff.isInClient()) {
-          liff.openWindow({ url: LINE_OA_URL, external: true });
+          await liff.shareTargetPicker([
+            {
+              type: "text",
+              text: orderMessage,
+            },
+          ]);
+          toast.success("Order message sent to LINE!");
         } else {
+          // Fallback to opening LINE OA chat
           window.open(LINE_OA_URL, "_blank");
+          toast.info("Please paste the copied order message in the LINE chat.");
         }
       } catch (lineError) {
-        console.error("Failed to open LINE chat:", lineError);
+        console.error("Failed to send/share LINE message:", lineError);
         toast.info("Please manually open LINE and paste the order message.");
+        // Open LINE OA as a fallback
+        window.open(LINE_OA_URL, "_blank");
       }
 
       setShowThankYou(true);
@@ -199,7 +238,19 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
     } finally {
       setIsProcessing(false);
     }
-  }, [formatOrderMessage, cartItems, subtotal, clearCart, onClose, LINE_OA_URL, LIFF_ID, isLiffInitialized, user, lineProfile, getSelectedAddress]);
+  }, [
+    formatOrderMessage,
+    cartItems,
+    subtotal,
+    clearCart,
+    onClose,
+    LINE_OA_URL,
+    LIFF_ID,
+    isLiffInitialized,
+    user,
+    lineProfile,
+    getSelectedAddress,
+  ]);
 
   return (
     <AnimatePresence>
@@ -259,17 +310,19 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
                                 </option>
                               ))}
                             </select>
-                            
+
                             {selectedAddressId && (
                               <div className="text-xs text-text-secondary bg-background p-2 rounded border border-border-primary">
                                 {(() => {
-                                  const address = addresses.find(a => a._id === selectedAddressId);
+                                  const address = addresses.find((a) => a._id === selectedAddressId);
                                   if (!address) return null;
                                   return (
                                     <>
                                       <p className="font-medium">{address.recipientName}</p>
                                       <p>{address.street}</p>
-                                      <p>{address.city}, {address.state} {address.postalCode}</p>
+                                      <p>
+                                        {address.city}, {address.state} {address.postalCode}
+                                      </p>
                                       <p>{address.country}</p>
                                       {address.phone && <p>Phone: {address.phone}</p>}
                                     </>
@@ -286,7 +339,9 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
                   <div className="mb-4">
                     <p className="text-sm text-text-secondary mb-2">
                       Your order will be sent to our LINE Official Account ({LINE_OA_ID}).{" "}
-                      {orderProcessed ? "The message has been copied to your clipboard. Please paste it in the LINE chat." : ""}
+                      {orderProcessed
+                        ? "The message has been copied to your clipboard. Please paste it in the LINE chat."
+                        : ""}
                     </p>
                     <div className="bg-background-secondary p-4 rounded-lg text-sm font-mono whitespace-pre-wrap relative">
                       {formatOrderMessage()}
@@ -341,7 +396,7 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
                         </>
                       ) : (
                         <>
-                          <span>Process Order</span>
+                          <span>Process Order via LINE</span>
                           <ExternalLink className="h-4 w-4" />
                         </>
                       )}
@@ -386,7 +441,8 @@ const LineCheckoutModal = ({ isOpen, onClose }) => {
                 </div>
                 <h3 className="text-xl font-semibold text-text-primary mb-2">Thank You!</h3>
                 <p className="text-sm text-text-secondary mb-4">
-                  Your order (ID: {orderId}) has been processed. Please paste the copied message to our LINE Official Account ({LINE_OA_ID}).
+                  Your order (ID: {orderId}) has been processed. Please paste the copied message to our LINE Official
+                  Account ({LINE_OA_ID}).
                 </p>
                 <button
                   onClick={() => {
