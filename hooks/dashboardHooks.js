@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
-// Other hooks (useUserData, useOrders, useAllOrders, useUsers) remain unchanged
 export const useUserData = () => {
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,33 +47,33 @@ export const useOrders = (initialPage = 1, initialLimit = 10) => {
     totalPages: 0,
   });
 
+  const fetchOrders = useCallback(async () => {
+    setIsLoading(true);
+    setIsError(false);
+
+    try {
+      const response = await axios.get(
+        `/api/orders/get?page=${pagination.page}&limit=${pagination.limit}`
+      );
+      setOrders(response.data.orders || []);
+      setPagination({
+        page: response.data.page || initialPage,
+        limit: response.data.limit || initialLimit,
+        total: response.data.total || 0,
+        totalPages: response.data.totalPages || 0,
+      });
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+      setIsError(true);
+      //toast.error("Failed to load orders. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [pagination.page, pagination.limit, initialPage, initialLimit]);
+
   useEffect(() => {
-    const fetchOrders = async () => {
-      setIsLoading(true);
-      setIsError(false);
-
-      try {
-        const response = await axios.get(
-          `/api/orders/get?page=${pagination.page}&limit=${pagination.limit}`
-        );
-        setOrders(response.data.orders || []);
-        setPagination({
-          page: response.data.page || initialPage,
-          limit: response.data.limit || initialLimit,
-          total: response.data.total || 0,
-          totalPages: response.data.totalPages || 0,
-        });
-      } catch (error) {
-        console.error("Error fetching orders:", error);
-        setIsError(true);
-        //toast.error("Failed to load orders. Please try again.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchOrders();
-  }, [pagination.page, pagination.limit]);
+  }, [fetchOrders]);
 
   const changePage = (newPage) => {
     setPagination((prev) => ({
@@ -91,6 +90,10 @@ export const useOrders = (initialPage = 1, initialLimit = 10) => {
     }));
   };
 
+  const refetchOrders = async () => {
+    await fetchOrders();
+  };
+
   return {
     orders,
     isLoading,
@@ -98,6 +101,7 @@ export const useOrders = (initialPage = 1, initialLimit = 10) => {
     pagination,
     changePage,
     changeLimit,
+    refetchOrders,
   };
 };
 
@@ -209,7 +213,6 @@ export const useWishlist = (initialPage = 1, initialLimit = 10) => {
     totalPages: 0,
   });
 
-  // Validate ObjectId format
   const isValidObjectId = (id) => {
     return /^[0-9a-fA-F]{24}$/.test(id);
   };
@@ -226,7 +229,6 @@ export const useWishlist = (initialPage = 1, initialLimit = 10) => {
         const wishlistItems = response.data.wishlist || [];
         const processedWishlist = await Promise.all(
           wishlistItems.map(async (item) => {
-            // Skip if productId is invalid
             if (!item.productId || !isValidObjectId(item.productId)) {
               console.warn(`Invalid productId: ${item.productId}`);
               return null;
@@ -261,7 +263,6 @@ export const useWishlist = (initialPage = 1, initialLimit = 10) => {
             }
           })
         );
-        // Filter out null entries (invalid or failed products)
         const validWishlist = processedWishlist.filter((item) => item !== null);
         setWishlist(validWishlist);
         setPagination({

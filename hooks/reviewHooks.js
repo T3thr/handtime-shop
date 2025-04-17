@@ -57,6 +57,7 @@ export const useProductReviews = (productId, page = 1, limit = 5) => {
     reviews: data?.reviews || [],
     averageRating: data?.averageRating || 0,
     ratingCounts: data?.ratingCounts || {},
+    reviewCount: data?.total || 0,
     isLoading,
     isError: !!error,
     pagination,
@@ -136,6 +137,10 @@ export const useAllReviews = (page = 1, limit = 10, status = 'all') => {
       revalidateOnFocus: false,
       dedupingInterval: 30000,
       errorRetryCount: 2,
+      onError: (err) => {
+        console.error('Error fetching admin reviews:', err);
+        toast.error('Failed to load reviews');
+      },
     }
   );
 
@@ -151,10 +156,12 @@ export const useAllReviews = (page = 1, limit = 10, status = 'all') => {
   }, [data]);
 
   const changePage = (newPage) => {
-    setPagination((prev) => ({
-      ...prev,
-      page: newPage,
-    }));
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      setPagination((prev) => ({
+        ...prev,
+        page: newPage,
+      }));
+    }
   };
 
   const changeLimit = (newLimit) => {
@@ -187,8 +194,11 @@ export const submitReview = async (reviewData) => {
     throw new Error('Rating must be between 1 and 5');
   }
 
+  console.log('Submitting review data:', reviewData);
+
   try {
     const response = await axios.post('/api/review', reviewData);
+    toast.success('Review submitted successfully!');
     return response.data.review;
   } catch (error) {
     console.error('Error submitting review:', error);
@@ -206,17 +216,37 @@ export const submitReview = async (reviewData) => {
       message = 'Server error, please try again later';
     }
 
+    toast.error(message);
     throw new Error(message);
   }
 };
 
 export const updateReview = async (reviewId, reviewData) => {
+  if (!reviewId || !/^[0-9a-fA-F]{24}$/.test(reviewId)) {
+    throw new Error('Invalid review ID');
+  }
+
   try {
     const response = await axios.put(`/api/review/${reviewId}`, reviewData);
+    toast.success('Review updated successfully!');
     return response.data;
   } catch (error) {
     console.error('Error updating review:', error);
-    const message = error.response?.data?.message || 'Failed to update review';
+    const status = error.response?.status;
+    const serverError = error.response?.data?.error;
+    let message = 'Failed to update review';
+
+    if (status === 400) {
+      message = serverError || 'Invalid review data';
+    } else if (status === 401) {
+      message = 'Please log in to update the review';
+    } else if (status === 403) {
+      message = 'You are not authorized to update this review';
+    } else if (status === 404) {
+      message = 'Review not found';
+    }
+
+    toast.error(message);
     throw new Error(message);
   }
 };
@@ -229,7 +259,7 @@ export const deleteReview = async (reviewId) => {
   }
 
   try {
-    await axios.delete(`/api/review/${reviewId}`);
+    await axios.delete(`/api/admin/reviews?reviewId=${reviewId}`);
     toast.success('Review deleted successfully!');
     return true;
   } catch (error) {
@@ -259,13 +289,16 @@ export const updateReviewStatus = async (reviewId, status) => {
   if (!reviewId || !isValidObjectId(reviewId)) {
     throw new Error('Invalid review ID');
   }
-  if (!['pending', 'approved', 'rejected'].includes(status)) {
-    throw new Error('Invalid status');
+  if (!['show', 'hide'].includes(status)) {
+    throw new Error('Invalid status. Must be "show" or "hide"');
   }
 
   try {
-    const response = await axios.put(`/api/admin/reviews/${reviewId}/status`, { status });
+    const response = await axios.put(`/api/admin/reviews?reviewId=${reviewId}`, { status });
     toast.success('Review status updated successfully!');
+    // Trigger refetch of products to update averageRating
+    const { mutate: refetchProducts } = require('swr').useSWRConfig();
+    refetchProducts('/api/products');
     return response.data;
   } catch (error) {
     console.error('Error updating review status:', error);
@@ -285,6 +318,20 @@ export const updateReviewStatus = async (reviewId, status) => {
 
     toast.error(message);
     throw new Error(message);
+  }
+};
+
+export const getProductReviews = async (productId) => {
+  if (!productId || !/^[0-9a-fA-F]{24}$/.test(productId)) {
+    throw new Error('Invalid product ID');
+  }
+
+  try {
+    const response = await axios.get(`/api/review?productId=${productId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching product reviews:', error);
+    throw new Error('Failed to fetch reviews');
   }
 };
 

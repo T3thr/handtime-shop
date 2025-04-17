@@ -3,6 +3,17 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { FaUsers, FaShoppingCart, FaChartLine, FaEdit, FaTrash, FaStar, FaSortUp, FaSortDown, FaImage } from "react-icons/fa";
 import { useAllOrders, updateOrderStatus, deleteOrder, useUsers, updateUser } from "@/backend/lib/dashboardAction";
+import {
+  DashboardCard,
+  SectionHeader,
+  DataTable,
+  Card,
+  LoadingSpinner,
+  EmptyState,
+  OrderStatus,
+  Badge,
+  Pagination,
+} from "@/components/contents/DashboardUI";
 import { toast } from "react-toastify";
 import Image from "next/image";
 import AllOrderModal from "./AllOrderModal";
@@ -593,7 +604,7 @@ export const OrderManagement = () => {
 
 // Reviews Management Component
 export const ReviewsManagement = () => {
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState('all');
   const {
     reviews,
     isLoading,
@@ -610,43 +621,169 @@ export const ReviewsManagement = () => {
       refetchReviews();
       toast.success(`Review status updated to ${newStatus}`);
     } catch (error) {
-      console.error("Failed to update review status:", error);
-      toast.error("Failed to update review status");
+      console.error('Failed to update review status:', error);
+      toast.error('Failed to update review status');
     }
   };
 
   const handleDeleteReview = async (reviewId) => {
-    if (!confirm("Are you sure you want to delete this review?")) return;
+    if (!confirm('Are you sure you want to delete this review?')) return;
 
     try {
       await deleteReview(reviewId);
       refetchReviews();
     } catch (error) {
-      console.error("Failed to delete review:", error);
-      toast.error("Failed to delete review");
+      console.error('Failed to delete review:', error);
+      toast.error('Failed to delete review');
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "approved":
-        return "bg-green-100 text-green-800";
-      case "rejected":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
+  const reviewColumns = [
+    {
+      header: 'Product',
+      accessor: 'productId',
+      render: (row) => (
+        <div className="flex items-center">
+          <div className="h-10 w-10 flex-shrink-0 relative rounded-md overflow-hidden">
+            <Image
+              src={row.productId?.images?.[0]?.url || '/images/placeholder.jpg'}
+              alt={row.productId?.name || 'Product'}
+              fill
+              className="object-cover"
+            />
+          </div>
+          <div className="ml-4">
+            <div className="text-sm font-medium text-text-primary">
+              {row.productId?.name || 'Unknown Product'}
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: 'User',
+      accessor: 'userId',
+      render: (row) => (
+        <div className="flex items-center">
+          <div className="h-8 w-8 flex-shrink-0 relative rounded-full overflow-hidden">
+            <Image
+              src={row.userId?.avatar || '/images/avatar-placeholder.jpg'}
+              alt={row.userId?.name || 'User'}
+              fill
+              className="object-cover"
+            />
+          </div>
+          <div className="ml-3">
+            <div className="text-sm font-medium text-text-primary">
+              {row.userId?.name || 'Unknown User'}
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: 'Rating',
+      accessor: 'rating',
+      render: (row) => (
+        <div className="flex items-center">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <FaStar
+              key={star}
+              className={star <= row.rating ? 'text-yellow-400' : 'text-gray-300'}
+              size={16}
+            />
+          ))}
+        </div>
+      ),
+    },
+    {
+      header: 'Review',
+      accessor: 'comment',
+      render: (row) => (
+        <div>
+          {row.title && <div className="font-medium">{row.title}</div>}
+          <div className="text-sm text-text-secondary line-clamp-2">{row.comment}</div>
+          {row.images && row.images.length > 0 && (
+            <div className="flex mt-1 space-x-1">
+              {row.images.slice(0, 3).map((image, idx) => (
+                <div key={idx} className="h-6 w-6 relative rounded overflow-hidden">
+                  <Image src={image} alt={`Review image ${idx + 1}`} fill className="object-cover" />
+                </div>
+              ))}
+              {row.images.length > 3 && (
+                <div className="h-6 w-6 bg-background-secondary rounded flex items-center justify-center text-xs">
+                  +{row.images.length - 3}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      header: 'Status',
+      accessor: 'status',
+      render: (row) => (
+        <span
+          className={`px-2 py-1 text-xs font-semibold rounded-full ${
+            row.status === 'show' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}
+        >
+          {row.status}
+        </span>
+      ),
+    },
+    {
+      header: 'Date',
+      accessor: 'createdAt',
+      render: (row) => new Date(row.createdAt).toLocaleDateString(),
+    },
+    {
+      header: 'Actions',
+      accessor: 'actions',
+      render: (row) => (
+        <div className="flex space-x-2">
+          <button
+            onClick={() => handleUpdateStatus(row._id, row.status === 'show' ? 'hide' : 'show')}
+            className={`text-sm ${
+              row.status === 'show' ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'
+            }`}
+          >
+            {row.status === 'show' ? 'Hide' : 'Show'}
+          </button>
+          <button
+            onClick={() => handleDeleteReview(row._id)}
+            className="text-red-600 hover:text-red-900"
+          >
+            <FaTrash />
+          </button>
+        </div>
+      ),
+    },
+  ];
 
-  if (isLoading) return <div className="text-center py-10">Loading reviews...</div>;
-  if (isError) return <div className="text-center py-10 text-red-500">Failed to load reviews</div>;
+  if (isLoading) {
+    return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div></div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-error mb-4">Failed to load reviews</p>
+        <button
+          onClick={() => refetchReviews()}
+          className="px-4 py-2 bg-primary text-text-inverted rounded-lg hover:bg-primary-dark transition-colors duration-300"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 px-4 sm:px-0">
+      <SectionHeader title="Review Management" description="Manage user reviews for products" />
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <h2 className="text-xl sm:text-2xl font-bold">Review Management</h2>
         <div className="flex flex-col sm:flex-row gap-2">
           <select
             className="w-full sm:w-auto px-3 py-2 border rounded-md bg-background text-text-primary"
@@ -654,9 +791,8 @@ export const ReviewsManagement = () => {
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="all">All Reviews</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
+            <option value="show">Show</option>
+            <option value="hide">Hide</option>
           </select>
           <select
             className="w-full sm:w-auto px-3 py-2 border rounded-md bg-background text-text-primary"
@@ -670,189 +806,39 @@ export const ReviewsManagement = () => {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full bg-background border border-border-primary rounded-lg">
-          <thead className="bg-background-secondary">
-            <tr>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                Product
-              </th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                User
-              </th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                Rating
-              </th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                Review
-              </th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                Date
-              </th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border-primary">
-            {reviews.map((review) => (
-              <tr key={review._id} className="hover:bg-background-hover transition-colors">
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="h-10 w-10 flex-shrink-0 relative rounded-md overflow-hidden">
-                      <Image
-                        src={review.productId?.images?.[0]?.url || "/images/placeholder.jpg"}
-                        alt={review.productId?.name || "Product"}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-text-primary">
-                        {review.productId?.name || "Unknown Product"}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 flex-shrink-0 relative rounded-full overflow-hidden">
-                      <Image
-                        src={review.userId?.avatar || "/images/avatar-placeholder.jpg"}
-                        alt={review.userId?.name || "User"}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="ml-3">
-                      <div className="text-sm font-medium text-text-primary">
-                        {review.userId?.name || "Unknown User"}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center text-yellow-400">
-                    {[...Array(5)].map((_, i) => (
-                      <FaStar
-                        key={i}
-                        className={i < review.rating ? "text-yellow-400" : "text-gray-300"}
-                      />
-                    ))}
-                  </div>
-                </td>
-                <td className="px-4 sm:px-6 py-4">
-                  <div className="text-sm text-text-primary font-medium">{review.title}</div>
-                  <div className="text-sm text-text-secondary line-clamp-2">{review.comment}</div>
-                  {review.images && review.images.length > 0 && (
-                    <div className="flex mt-2 space-x-2">
-                      {review.images.map((image, index) => (
-                        <div key={index} className="h-8 w-8 relative rounded-md overflow-hidden">
-                          <Image
-                            src={image}
-                            alt={`Review image ${index + 1}`}
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                  <span
-                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
-                      review.status
-                    )}`}
-                  >
-                    {review.status}
-                  </span>
-                </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
-                  {new Date(review.createdAt).toLocaleDateString()}
-                </td>
-                <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <div className="flex space-x-2">
-                    {review.status === "pending" && (
-                      <>
-                        <button
-                          onClick={() => handleUpdateStatus(review._id, "approved")}
-                          className="text-green-600 hover:text-green-900"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => handleUpdateStatus(review._id, "rejected")}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Reject
-                        </button>
-                      </>
-                    )}
-                    {review.status === "approved" && (
-                      <button
-                        onClick={() => handleUpdateStatus(review._id, "rejected")}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Reject
-                      </button>
-                    )}
-                    {review.status === "rejected" && (
-                      <button
-                        onClick={() => handleUpdateStatus(review._id, "approved")}
-                        className="text-green-600 hover:text-green-900"
-                      >
-                        Approve
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleDeleteReview(review._id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      <FaTrash />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mt-4 gap-4">
-        <div className="text-sm text-text-secondary">
-          Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
-          {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} reviews
-        </div>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => changePage(pagination.page - 1)}
-            disabled={pagination.page === 1}
-            className={`px-3 py-1 rounded-md ${
-              pagination.page === 1
-                ? "bg-background-secondary text-text-secondary cursor-not-allowed"
-                : "bg-primary text-white hover:bg-primary-hover"
-            }`}
-          >
-            Previous
-          </button>
-          <button
-            onClick={() => changePage(pagination.page + 1)}
-            disabled={pagination.page === pagination.totalPages}
-            className={`px-3 py-1 rounded-md ${
-              pagination.page === pagination.totalPages
-                ? "bg-background-secondary text-text-secondary cursor-not-allowed"
-                : "bg-primary text-white hover:bg-primary-hover"
-            }`}
-          >
-            Next
-          </button>
-        </div>
-      </div>
+      <Card>
+        {reviews?.length > 0 ? (
+          <>
+            <DataTable
+              columns={reviewColumns}
+              data={reviews}
+              keyField="_id"
+              emptyMessage="No reviews found."
+            />
+            <div className="mt-4 flex justify-between items-center">
+              <div className="text-sm text-text-secondary">
+                Showing {(pagination.page - 1) * pagination.limit + 1} to{' '}
+                {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} reviews
+              </div>
+              <Pagination
+                currentPage={pagination.page}
+                totalPages={pagination.totalPages}
+                onPageChange={changePage}
+              />
+            </div>
+          </>
+        ) : (
+          <EmptyState
+            icon={FaStar}
+            title="No Reviews Found"
+            description="No reviews match the current filters."
+            action={{
+              label: 'Clear Filters',
+              onClick: () => setStatusFilter('all'),
+            }}
+          />
+        )}
+      </Card>
     </div>
   );
 };
@@ -869,311 +855,6 @@ export const BannerManagementSection = () => {
         Manage homepage banner images. Active banners will be displayed in the image slider on the homepage.
       </p>
       <BannerManagement />
-    </div>
-  );
-};
-
-// Reviews Management Component
-export const ReviewManagement = () => {
-  const [statusFilter, setStatusFilter] = useState("all");
-  const {
-    reviews,
-    isLoading,
-    isError,
-    pagination,
-    changePage,
-    changeLimit,
-    refetch: refetchReviews,
-  } = useAllReviews(1, 10, statusFilter);
-
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
-  const [selectedReview, setSelectedReview] = useState(null);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-
-  const handleUpdateStatus = async (reviewId, newStatus) => {
-    try {
-      await updateReviewStatus(reviewId, newStatus);
-      toast.success(`Review ${newStatus} successfully`);
-      refetchReviews();
-    } catch (error) {
-      console.error("Error updating review status:", error);
-      toast.error("Failed to update review status");
-    }
-  };
-
-  const handleDeleteReview = async (reviewId) => {
-    if (window.confirm("Are you sure you want to delete this review? This action cannot be undone.")) {
-      try {
-        await deleteReview(reviewId);
-        refetchReviews();
-      } catch (error) {
-        console.error("Error deleting review:", error);
-        toast.error("Failed to delete review");
-      }
-    }
-  };
-
-  const requestSort = (key) => {
-    let direction = 'ascending';
-    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
-      direction = 'descending';
-    } else if (sortConfig.key === key && sortConfig.direction === 'descending') {
-      direction = null;
-    }
-    setSortConfig({ key, direction });
-  };
-
-  const getSortIcon = (key) => {
-    return (
-      <span className="inline-flex flex-col ml-1">
-        <FaSortUp 
-          className={`h-3 w-3 ${sortConfig.key === key && sortConfig.direction === 'ascending' ? 'text-primary' : 'text-text-secondary opacity-30'}`} 
-        />
-        <FaSortDown 
-          className={`h-3 w-3 -mt-1 ${sortConfig.key === key && sortConfig.direction === 'descending' ? 'text-primary' : 'text-text-secondary opacity-30'}`} 
-        />
-      </span>
-    );
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "approved":
-        return "bg-green-100 text-green-800";
-      case "rejected":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const renderStars = (rating) => {
-    return (
-      <div className="flex">
-        {[...Array(5)].map((_, i) => (
-          <FaStar
-            key={i}
-            className={i < rating ? "text-yellow-400" : "text-gray-300"}
-          />
-        ))}
-      </div>
-    );
-  };
-
-  const sortedReviews = React.useMemo(() => {
-    let sortableReviews = [...(reviews || [])];
-    if (sortConfig.key && sortConfig.direction) {
-      sortableReviews.sort((a, b) => {
-        if (sortConfig.key === 'createdAt') {
-          const dateA = new Date(a.createdAt);
-          const dateB = new Date(b.createdAt);
-          
-          if (sortConfig.direction === 'ascending') {
-            return dateA - dateB;
-          }
-          return dateB - dateA;
-        } else if (sortConfig.key === 'rating') {
-          if (sortConfig.direction === 'ascending') {
-            return a.rating - b.rating;
-          }
-          return b.rating - a.rating;
-        } else {
-          if (a[sortConfig.key] < b[sortConfig.key]) {
-            return sortConfig.direction === 'ascending' ? -1 : 1;
-          }
-          if (a[sortConfig.key] > b[sortConfig.key]) {
-            return sortConfig.direction === 'ascending' ? 1 : -1;
-          }
-          return 0;
-        }
-      });
-    }
-    return sortableReviews;
-  }, [reviews, sortConfig]);
-
-  if (isLoading) return <div className="text-center py-10">Loading reviews...</div>;
-  if (isError) return <div className="text-center py-10 text-red-500">Failed to load reviews</div>;
-
-  return (
-    <div className="space-y-6 px-4 sm:px-0">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <h2 className="text-xl sm:text-2xl font-bold">Review Management</h2>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <select
-            className="w-full sm:w-auto px-3 py-2 border rounded-md bg-background text-text-primary"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="all">All Reviews</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-          </select>
-          <select
-            className="w-full sm:w-auto px-3 py-2 border rounded-md bg-background text-text-primary"
-            value={pagination.limit}
-            onChange={(e) => changeLimit(Number(e.target.value))}
-          >
-            <option value={5}>5 per page</option>
-            <option value={10}>10 per page</option>
-            <option value={20}>20 per page</option>
-          </select>
-        </div>
-      </div>
-
-      {reviews && reviews.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-background border border-border-primary rounded-lg">
-            <thead className="bg-background-secondary">
-              <tr>
-                <th 
-                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
-                  onClick={() => requestSort("productId.name")}
-                >
-                  Product {getSortIcon("productId.name")}
-                </th>
-                <th 
-                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
-                  onClick={() => requestSort("userId.name")}
-                >
-                  Customer {getSortIcon("userId.name")}
-                </th>
-                <th 
-                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
-                  onClick={() => requestSort("rating")}
-                >
-                  Rating {getSortIcon("rating")}
-                </th>
-                <th 
-                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider"
-                >
-                  Comment
-                </th>
-                <th 
-                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
-                  onClick={() => requestSort("status")}
-                >
-                  Status {getSortIcon("status")}
-                </th>
-                <th 
-                  className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer"
-                  onClick={() => requestSort("createdAt")}
-                >
-                  Date {getSortIcon("createdAt")}
-                </th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-primary">
-              {sortedReviews.map((review) => (
-                <tr key={review._id} className="hover:bg-background-hover transition-colors">
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-text-primary">
-                    {review.productId?.name || "Unknown Product"}
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-primary">
-                    {review.userId?.name || "Anonymous"}
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                    {renderStars(review.rating)}
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 text-sm text-text-primary">
-                    <div className="max-w-xs truncate">{review.comment}</div>
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
-                        review.status
-                      )}`}
-                    >
-                      {review.status}
-                    </span>
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
-                    {new Date(review.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      {review.status === "pending" && (
-                        <>
-                          <button
-                            onClick={() => handleUpdateStatus(review._id, "approved")}
-                            className="text-green-600 hover:text-green-900"
-                            title="Approve"
-                          >
-                            <FaCheck />
-                          </button>
-                          <button
-                            onClick={() => handleUpdateStatus(review._id, "rejected")}
-                            className="text-red-600 hover:text-red-900"
-                            title="Reject"
-                          >
-                            <FaTimes />
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => handleDeleteReview(review._id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete"
-                      >
-                        <FaTrash />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="text-center py-10 bg-background-secondary rounded-lg">
-          <FaStar className="mx-auto h-12 w-12 text-text-muted mb-3" />
-          <h3 className="text-lg font-medium text-text-primary">No reviews found</h3>
-          <p className="text-text-secondary mt-1">
-            {statusFilter !== "all"
-              ? `There are no ${statusFilter} reviews at the moment.`
-              : "There are no reviews in the system yet."}
-          </p>
-        </div>
-      )}
-
-      {/* Pagination */}
-      {reviews && reviews.length > 0 && (
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mt-4 gap-4">
-          <div className="text-sm text-text-secondary">
-            Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
-            {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} reviews
-          </div>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => changePage(pagination.page - 1)}
-              disabled={pagination.page === 1}
-              className={`px-3 py-1 rounded-md ${
-                pagination.page === 1
-                  ? "bg-background-secondary text-text-secondary cursor-not-allowed"
-                  : "bg-primary text-white hover:bg-primary-hover"
-              }`}
-            >
-              Previous
-            </button>
-            <button
-              onClick={() => changePage(pagination.page + 1)}
-              disabled={pagination.page === pagination.totalPages}
-              className={`px-3 py-1 rounded-md ${
-                pagination.page === pagination.totalPages
-                  ? "bg-background-secondary text-text-secondary cursor-not-allowed"
-                  : "bg-primary text-white hover:bg-primary-hover"
-              }`}
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

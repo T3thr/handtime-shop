@@ -215,11 +215,27 @@ const OrderInfoModal = ({ isOpen, onClose, order }) => {
 export const OverviewSection = ({ session, setActiveSection }) => {
   const { userData, isLoading: userLoading, isError: userError } = useUserData();
   const { orders, isLoading: ordersLoading, isError: ordersError } = useOrders(1, 2);
-  const { wishlist, isLoading: wishlistLoading, isError: wishlistError } = useWishlist();
+  const { wishlist, isLoading: wishlistLoading, isError: wishlistError, toggleWishlistItem } = useWishlist();
+  const { addToCart, cartItems } = useCart();
   const router = useRouter();
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+
+  const staggerContainer = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+      },
+    },
+  };
+
+  const fadeInUp = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 },
+  };
 
   const isLoading = userLoading || ordersLoading || wishlistLoading;
   const isError = userError || ordersError || wishlistError;
@@ -248,16 +264,9 @@ export const OverviewSection = ({ session, setActiveSection }) => {
         if (sortConfig.key === 'createdAt') {
           const dateA = new Date(a.createdAt);
           const dateB = new Date(b.createdAt);
-          
-          if (sortConfig.direction === 'ascending') {
-            return dateA - dateB;
-          }
-          return dateB - dateA;
+          return sortConfig.direction === 'ascending' ? dateA - dateB : dateB - dateA;
         } else if (sortConfig.key === 'totalAmount') {
-          if (sortConfig.direction === 'ascending') {
-            return a.totalAmount - b.totalAmount;
-          }
-          return b.totalAmount - a.totalAmount;
+          return sortConfig.direction === 'ascending' ? a.totalAmount - b.totalAmount : b.totalAmount - a.totalAmount;
         } else {
           if (a[sortConfig.key] < b[sortConfig.key]) {
             return sortConfig.direction === 'ascending' ? -1 : 1;
@@ -275,6 +284,60 @@ export const OverviewSection = ({ session, setActiveSection }) => {
   const handleOpenInfoModal = (order) => {
     setSelectedOrder(order);
     setIsInfoModalOpen(true);
+  };
+
+  const handleRemoveFromWishlist = async (productId) => {
+    try {
+      await toggleWishlistItem(productId);
+      toast.success('Removed from wishlist');
+    } catch (error) {
+      toast.error('Failed to remove from wishlist');
+    }
+  };
+
+  const handleAddToCart = async (product) => {
+    if (!product._id) {
+      toast.error('Cannot add to cart: Invalid product');
+      return;
+    }
+    try {
+      const cartItem = {
+        id: product._id,
+        productId: product._id,
+        name: product.name,
+        price: product.price,
+        image: product.images[0]?.url || '/images/placeholder.jpg',
+        category: product.categories[0]?.name || product.categories[0] || '',
+      };
+      await addToCart(cartItem);
+      toast.success(
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 relative rounded overflow-hidden">
+            <Image
+              src={product.images[0]?.url || '/images/placeholder.jpg'}
+              alt={product.name}
+              fill
+              className="object-cover"
+            />
+          </div>
+          <div>
+            <p className="font-medium text-text-primary">{product.name}</p>
+            <p className="text-sm text-text-muted">Added to cart</p>
+          </div>
+        </div>
+      );
+    } catch (error) {
+      toast.error('Failed to add to cart');
+    }
+  };
+
+  const isProductInCart = (productId) => {
+    return cartItems.some((item) => item.productId === productId || item.id === productId);
+  };
+
+  const getProductQuantityInCart = (productId) => {
+    const item = cartItems.find((item) => item.productId === productId || item.id === productId);
+    return item ? item.quantity : 0;
   };
 
   if (isLoading) {
@@ -298,59 +361,65 @@ export const OverviewSection = ({ session, setActiveSection }) => {
   const stats = [
     {
       icon: FaShoppingBag,
-      title: "Total Orders",
+      title: 'Total Orders',
       value: userData?.stats?.totalOrders || 0,
-      color: "text-primary",
+      color: 'text-primary',
     },
-    { icon: FaHeart, title: "Wishlist Items", value: wishlist?.length || 0, color: "text-error" },
+    { icon: FaHeart, title: 'Wishlist Items', value: wishlist?.length || 0, color: 'text-error' },
     {
       icon: MdLocalShipping,
-      title: "In Transit",
-      value: orders?.filter((o) => o.status === "shipped").length || 0,
-      color: "text-purple-400",
+      title: 'In Transit',
+      value: orders?.filter((o) => o.status === 'shipped').length || 0,
+      color: 'text-purple-400',
     },
     {
       icon: FaBox,
-      title: "Delivered",
-      value: orders?.filter((o) => o.status === "delivered").length || 0,
-      color: "text-success",
+      title: 'Delivered',
+      value: orders?.filter((o) => o.status === 'delivered').length || 0,
+      color: 'text-success',
     },
   ];
 
   const orderColumns = [
-    { 
-      header: "Order ID", 
-      accessor: "orderId", 
-      className: "font-medium text-primary",
+    {
+      header: 'Order ID',
+      accessor: 'orderId',
+      className: 'font-medium text-primary',
       sortable: true,
-      onClick: () => requestSort("orderId"),
+      onClick: () => requestSort('orderId'),
       headerContent: () => (
-        <>Order ID {getSortIcon("orderId")}</>
-      )
+        <>
+          Order ID {getSortIcon('orderId')}
+        </>
+      ),
     },
     {
-      header: "Date",
-      accessor: "createdAt",
+      header: 'Date',
+      accessor: 'createdAt',
       render: (row) => new Date(row.createdAt).toLocaleDateString(),
       sortable: true,
-      onClick: () => requestSort("createdAt"),
+      onClick: () => requestSort('createdAt'),
       headerContent: () => (
-        <>Date {getSortIcon("createdAt")}</>
-      )
-    },
-    { 
-      header: "Status", 
-      accessor: "status", 
-      render: (row) => <OrderStatus status={row.status} />,
-      sortable: true,
-      onClick: () => requestSort("status"),
-      headerContent: () => (
-        <>Status {getSortIcon("status")}</>
-      )
+        <>
+          Date {getSortIcon('createdAt')}
+        </>
+      ),
     },
     {
-      header: "Info",
-      accessor: "items",
+      header: 'Status',
+      accessor: 'status',
+      render: (row) => <OrderStatus status={row.status} />,
+      sortable: true,
+      onClick: () => requestSort('status'),
+      headerContent: () => (
+        <>
+          Status {getSortIcon('status')}
+        </>
+      ),
+    },
+    {
+      header: 'Info',
+      accessor: 'items',
       render: (row) => (
         <div className="flex flex-col">
           <div className="flex items-center mb-1">
@@ -381,8 +450,8 @@ export const OverviewSection = ({ session, setActiveSection }) => {
             )}
           </div>
           <div className="text-xs text-text-secondary">
-            {row.items.map(item => item.name).slice(0, 2).join(", ")}
-            {row.items.length > 2 ? ` and ${row.items.length - 2} more` : ""}
+            {row.items.map((item) => item.name).slice(0, 2).join(', ')}
+            {row.items.length > 2 ? ` and ${row.items.length - 2} more` : ''}
           </div>
           <button
             onClick={() => handleOpenInfoModal(row)}
@@ -394,14 +463,16 @@ export const OverviewSection = ({ session, setActiveSection }) => {
       ),
     },
     {
-      header: "Total",
-      accessor: "totalAmount",
+      header: 'Total',
+      accessor: 'totalAmount',
       render: (row) => `฿${row.totalAmount.toFixed(2)}`,
       sortable: true,
-      onClick: () => requestSort("totalAmount"),
+      onClick: () => requestSort('totalAmount'),
       headerContent: () => (
-        <>Total {getSortIcon("totalAmount")}</>
-      )
+        <>
+          Total {getSortIcon('totalAmount')}
+        </>
+      ),
     },
   ];
 
@@ -429,7 +500,7 @@ export const OverviewSection = ({ session, setActiveSection }) => {
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
             <h3 className="text-lg font-bold mb-2 sm:mb-0">Recent Orders</h3>
             <button
-              onClick={() => setActiveSection("orders")}
+              onClick={() => setActiveSection('orders')}
               className="text-sm text-primary hover:text-primary-dark flex items-center"
             >
               View All <ChevronRight className="w-4 h-4 ml-1" />
@@ -449,8 +520,8 @@ export const OverviewSection = ({ session, setActiveSection }) => {
               title="No Orders Yet"
               description="Your order history will appear here once you make a purchase."
               action={{
-                label: "Start Shopping",
-                onClick: () => router.push("/"),
+                label: 'Start Shopping',
+                onClick: () => router.push('/'),
               }}
             />
           )}
@@ -460,7 +531,7 @@ export const OverviewSection = ({ session, setActiveSection }) => {
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
             <h3 className="text-lg font-bold mb-2 sm:mb-0">Wishlist</h3>
             <button
-              onClick={() => setActiveSection("wishlist")}
+              onClick={() => setActiveSection('wishlist')}
               className="text-sm text-primary hover:text-primary-dark flex items-center"
             >
               View All <ChevronRight className="w-4 h-4 ml-1" />
@@ -468,55 +539,108 @@ export const OverviewSection = ({ session, setActiveSection }) => {
           </div>
 
           {wishlist && wishlist.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {wishlist.slice(0, 3).map((item) => (
-                <div
-                  key={item._id}
-                  className="border border-border-primary rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                >
-                  <div className="relative h-40">
-                    <Image
-                      src={item.productId.images?.[0]?.url || "/images/placeholder.jpg"}
-                      alt={item.productId.name}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                  <div className="p-4">
-                    <h4 className="font-medium text-text-primary mb-1 line-clamp-1">
-                      {item.productId.name}
-                    </h4>
-                    <p className="text-primary font-bold">฿{item.productId.price.toFixed(2)}</p>
-                    <div className="flex mt-2 space-x-2">
-                      <button
-                        onClick={() => {
-                          // Add to cart logic
-                        }}
-                        className="flex-1 px-3 py-1.5 bg-primary text-text-inverted rounded-md text-sm hover:bg-primary-hover flex items-center justify-center"
-                      >
-                        <FaShoppingCart className="mr-1" /> Add to Cart
-                      </button>
-                      <button
-                        onClick={() => {
-                          // Remove from wishlist logic
-                        }}
-                        className="px-3 py-1.5 border border-border-primary rounded-md text-sm hover:bg-background-secondary"
-                      >
-                        <FaTrash />
-                      </button>
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+            >
+              {wishlist.slice(0, 3).map((item, index) => {
+                const product = item;
+                if (!product._id) {
+                  console.warn('Skipping product with missing _id:', product);
+                  return null;
+                }
+                return (
+                  <motion.div
+                    key={product._id}
+                    variants={fadeInUp}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                    whileHover={{ y: -5 }}
+                    className="group relative bg-surface-card rounded-xl shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md"
+                  >
+                    <div className="aspect-square relative overflow-hidden cursor-pointer">
+                      <Image
+                        src={product.images[0]?.url || '/images/placeholder.jpg'}
+                        alt={product.name}
+                        fill
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <div className="absolute top-3 right-3">
+                        <button
+                          onClick={() => handleRemoveFromWishlist(product._id)}
+                          className="p-2 rounded-full bg-surface-card opacity-90 backdrop-blur-sm hover:bg-surface-card transition-colors duration-200"
+                          aria-label="Remove from wishlist"
+                        >
+                          <Heart className="w-5 h-5 text-error" fill="currentColor" />
+                        </button>
+                      </div>
+                      {product.quantity <= 0 && !product.continueSellingWhenOutOfStock && (
+                        <div className="absolute top-0 left-0 w-full bg-error/90 text-text-inverted text-center py-1 text-sm font-medium">
+                          Out of Stock
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                    <div className="p-4">
+                      <h3 className="font-medium text-text-primary line-clamp-1 mb-1">{product.name}</h3>
+                      <p className="text-primary font-bold mb-2">฿{product.price.toFixed(2)}</p>
+                      <div className="flex items-center mb-3">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-4 h-4 ${
+                              i < Math.round(product.averageRating || 0)
+                                ? 'text-warning fill-current'
+                                : 'text-text-muted'
+                            }`}
+                          />
+                        ))}
+                        <span className="ml-2 text-xs text-text-secondary">
+                          ({product.averageRating?.toFixed(1) || '0'})
+                        </span>
+                      </div>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handleAddToCart(product)}
+                        disabled={product.quantity <= 0 && !product.continueSellingWhenOutOfStock}
+                        className={`w-full flex items-center justify-center px-4 py-2 rounded-full transition-colors duration-200 ${
+                          isProductInCart(product._id)
+                            ? 'bg-primary-dark text-text-inverted'
+                            : product.quantity <= 0 && !product.continueSellingWhenOutOfStock
+                            ? 'bg-background-secondary text-text-muted cursor-not-allowed'
+                            : 'bg-primary text-text-inverted hover:bg-primary-dark'
+                        }`}
+                        aria-label={isProductInCart(product._id) ? 'View in cart' : 'Add to cart'}
+                      >
+                        {isProductInCart(product._id) ? (
+                          <>
+                            <ShoppingBag className="w-4 h-4 mr-1" />
+                            <span className="text-xs mr-1">{getProductQuantityInCart(product._id)}</span>
+                            <span className="text-sm">In Cart</span>
+                          </>
+                        ) : (
+                          <>
+                            <ShoppingBag className="w-4 h-4 mr-1" />
+                            <span className="text-sm">Add To Cart</span>
+                          </>
+                        )}
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
           ) : (
             <EmptyState
               icon={FaHeart}
               title="Your Wishlist is Empty"
               description="Save items you like for future reference."
               action={{
-                label: "Explore Products",
-                onClick: () => router.push("/"),
+                label: 'Explore Products',
+                onClick: () => router.push('/'),
               }}
             />
           )}
@@ -533,7 +657,7 @@ export const OverviewSection = ({ session, setActiveSection }) => {
 };
 
 export const OrdersSection = ({ session }) => {
-  const { orders, isLoading, isError, pagination, changePage, refetch: refetchOrders } = useOrders();
+  const { orders, isLoading, isError, pagination, changePage, refetchOrders } = useOrders();
   const router = useRouter();
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
@@ -542,25 +666,21 @@ export const OrdersSection = ({ session }) => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
 
-  // Check if order has items that need reviews
   const orderNeedsReviews = (order) => {
     if (order.status !== "delivered") return false;
     return order.items.some(item => !item.reviewStatus);
   };
 
-  // Count items that need reviews in an order
   const countItemsNeedingReview = (order) => {
     if (order.status !== "delivered") return 0;
     return order.items.filter(item => !item.reviewStatus).length;
   };
 
-  // Check if any orders need reviews
   const hasOrdersNeedingReviews = useMemo(() => {
     if (!orders || orders.length === 0) return false;
     return orders.some(orderNeedsReviews);
   }, [orders]);
 
-  // Count total items needing reviews
   const totalItemsNeedingReviews = useMemo(() => {
     if (!orders || orders.length === 0) return 0;
     return orders.reduce((total, order) => {
@@ -592,16 +712,9 @@ export const OrdersSection = ({ session }) => {
         if (sortConfig.key === 'createdAt') {
           const dateA = new Date(a.createdAt);
           const dateB = new Date(b.createdAt);
-          
-          if (sortConfig.direction === 'ascending') {
-            return dateA - dateB;
-          }
-          return dateB - dateA;
+          return sortConfig.direction === 'ascending' ? dateA - dateB : dateB - dateA;
         } else if (sortConfig.key === 'totalAmount') {
-          if (sortConfig.direction === 'ascending') {
-            return a.totalAmount - b.totalAmount;
-          }
-          return b.totalAmount - a.totalAmount;
+          return sortConfig.direction === 'ascending' ? a.totalAmount - b.totalAmount : b.totalAmount - a.totalAmount;
         } else {
           if (a[sortConfig.key] < b[sortConfig.key]) {
             return sortConfig.direction === 'ascending' ? -1 : 1;
@@ -617,9 +730,6 @@ export const OrdersSection = ({ session }) => {
   }, [orders, sortConfig]);
 
   const handleReviewClick = (product, orderId) => {
-    console.log("Review click with product:", product, "orderId:", orderId);
-    
-    // Enhanced validation to handle all possible product data structures
     if (!product) {
       toast.error("Cannot open review form: Product information is missing");
       return;
@@ -630,8 +740,6 @@ export const OrdersSection = ({ session }) => {
       return;
     }
     
-    // Normalize the product object structure to ensure consistency
-    // This handles all possible formats of product data
     const normalizedProduct = {
       _id: product._id || 
            (typeof product.productId === 'object' ? product.productId._id : product.productId) ||
@@ -645,8 +753,6 @@ export const OrdersSection = ({ session }) => {
               (typeof product.product === 'object' && product.product.images ? product.product.images : null) ||
               (product.image ? [{ url: product.image }] : [{ url: "/images/placeholder.jpg" }]),
     };
-    
-    console.log("Normalized product:", normalizedProduct);
     
     if (!normalizedProduct._id) {
       toast.error("Cannot open review form: Invalid product ID");
@@ -663,7 +769,6 @@ export const OrdersSection = ({ session }) => {
     setIsInfoModalOpen(true);
   };
 
-  // Listen for events from the OrderInfoModal
   useEffect(() => {
     const handleOpenReviewModal = (e) => {
       const { product, orderId } = e.detail;
@@ -737,7 +842,7 @@ export const OrdersSection = ({ session }) => {
                   />
                 ) : (
                   <div className="w-full h-full bg-background-secondary flex items-center justify-center">
-                    <FaBox className="text-text-muted text-xs" />
+                    <FaShoppingBag className="text-text-muted text-xs" />
                   </div>
                 )}
               </div>
@@ -789,7 +894,12 @@ export const OrdersSection = ({ session }) => {
           </button>
           {row.status === "delivered" && orderNeedsReviews(row) && (
             <button
-              onClick={() => handleOpenInfoModal(row)}
+              onClick={() => {
+                const firstUnreviewedItem = row.items.find(item => !item.reviewStatus);
+                if (firstUnreviewedItem) {
+                  handleReviewClick(firstUnreviewedItem, row._id);
+                }
+              }}
               className="px-3 py-1 bg-amber-500 text-white text-sm rounded-md hover:bg-amber-600 transition-colors flex items-center"
             >
               <FaStar className="mr-1" /> Review
@@ -801,7 +911,7 @@ export const OrdersSection = ({ session }) => {
   ];
 
   if (isLoading) {
-    return <LoadingSpinner />;
+    return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div></div>;
   }
 
   if (isError) {
@@ -809,7 +919,7 @@ export const OrdersSection = ({ session }) => {
       <div className="text-center py-8">
         <p className="text-error mb-4">Failed to load orders</p>
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => refetchOrders()}
           className="px-4 py-2 bg-primary text-text-inverted rounded-lg hover:bg-primary-dark transition-colors duration-300"
         >
           Retry
@@ -876,14 +986,24 @@ export const OrdersSection = ({ session }) => {
 
       <ReviewModal
         isOpen={reviewModalOpen}
-        onClose={() => setReviewModalOpen(false)}
+        onClose={() => {
+          setReviewModalOpen(false);
+          setSelectedProduct(null);
+          setSelectedOrderId(null);
+          refetchOrders();
+        }}
         product={selectedProduct}
         orderId={selectedOrderId}
+        onReviewSubmitted={() => refetchOrders()}
       />
 
       <OrderInfoModal
         isOpen={isInfoModalOpen}
-        onClose={() => setIsInfoModalOpen(false)}
+        onClose={() => {
+          setIsInfoModalOpen(false);
+          setSelectedOrder(null);
+          refetchOrders();
+        }}
         order={selectedOrder}
       />
     </>
@@ -894,9 +1014,8 @@ export const WishlistSection = ({ session, onAddToCart }) => {
   const { wishlist, isLoading, isError, pagination, changePage, toggleWishlistItem } = useWishlist();
   const router = useRouter();
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const { cartItems } = useCart(); // Use CartContext to check cart status
+  const { cartItems } = useCart();
 
-  // Animation variants from Product.jsx
   const staggerContainer = {
     hidden: { opacity: 0 },
     visible: {
@@ -915,34 +1034,33 @@ export const WishlistSection = ({ session, onAddToCart }) => {
   const handleRemoveFromWishlist = async (productId) => {
     try {
       await toggleWishlistItem(productId);
+      toast.success('Removed from wishlist');
     } catch (error) {
-      toast.error("Failed to remove from wishlist");
+      toast.error('Failed to remove from wishlist');
     }
   };
 
   const handleAddToCart = async (product) => {
     if (!product._id) {
-      console.error("Invalid product _id:", product);
-      toast.error("Cannot add to cart: Invalid product");
+      console.error('Invalid product _id:', product);
+      toast.error('Cannot add to cart: Invalid product');
       return;
     }
-
     try {
       const cartItem = {
         id: product._id,
-        productId: product._id, // Match cartItems key
+        productId: product._id,
         name: product.name,
         price: product.price,
-        image: product.images[0]?.url || "/images/placeholder.jpg",
-        category: product.categories[0]?.name || product.categories[0] || "",
+        image: product.images[0]?.url || '/images/placeholder.jpg',
+        category: product.categories[0]?.name || product.categories[0] || '',
       };
-      console.log("Adding to cart:", cartItem);
       await onAddToCart(cartItem);
       toast.success(
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 relative rounded overflow-hidden">
             <Image
-              src={product.images[0]?.url || "/images/placeholder.jpg"}
+              src={product.images[0]?.url || '/images/placeholder.jpg'}
               alt={product.name}
               fill
               className="object-cover"
@@ -955,15 +1073,15 @@ export const WishlistSection = ({ session, onAddToCart }) => {
         </div>
       );
     } catch (error) {
-      console.error("Error adding to cart:", error);
-      toast.error("Failed to add to cart");
+      console.error('Error adding to cart:', error);
+      toast.error('Failed to add to cart');
     }
   };
 
   const handleProductClick = (product) => {
     if (!product._id) {
-      console.error("Invalid product _id for modal:", product);
-      toast.error("Cannot view product: Invalid product");
+      console.error('Invalid product _id for modal:', product);
+      toast.error('Cannot view product: Invalid product');
       return;
     }
     setSelectedProduct(product);
@@ -979,7 +1097,24 @@ export const WishlistSection = ({ session, onAddToCart }) => {
   };
 
   if (isLoading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 p-4">
+        {[...Array(4)].map((_, index) => (
+          <div
+            key={index}
+            className="bg-surface-card rounded-xl shadow-sm overflow-hidden animate-pulse"
+          >
+            <div className="aspect-square bg-gray-200"></div>
+            <div className="p-5 space-y-3">
+              <div className="h-5 bg-gray-200 rounded w-3/4"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+              <div className="h-10 bg-gray-200 rounded-full"></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   if (isError) {
@@ -998,7 +1133,7 @@ export const WishlistSection = ({ session, onAddToCart }) => {
 
   return (
     <>
-      <SectionHeader title="Your Wishlist" />
+      <SectionHeader title="Your Wishlist" description="Browse and manage your saved items." />
       <Card>
         {wishlist?.length > 0 ? (
           <>
@@ -1006,12 +1141,12 @@ export const WishlistSection = ({ session, onAddToCart }) => {
               variants={staggerContainer}
               initial="hidden"
               animate="visible"
-              className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 p-4"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 p-4"
             >
               {wishlist.map((item, index) => {
-                const product = item; // Use item directly as it contains all product data
+                const product = item;
                 if (!product._id) {
-                  console.warn("Skipping product with missing _id:", product);
+                  console.warn('Skipping product with missing _id:', product);
                   return null;
                 }
                 return (
@@ -1026,27 +1161,30 @@ export const WishlistSection = ({ session, onAddToCart }) => {
                     <div
                       className="aspect-square relative overflow-hidden cursor-pointer"
                       onClick={() => handleProductClick(product)}
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === 'Enter' && handleProductClick(product)}
+                      role="button"
+                      aria-label={`View details for ${product.name}`}
                     >
                       <Image
-                        src={product.images[0]?.url || "/images/placeholder.jpg"}
+                        src={product.images[0]?.url || '/images/placeholder.jpg'}
                         alt={product.name}
                         fill
                         className="object-cover transition-transform duration-500 group-hover:scale-105"
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                        priority={index < 4}
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                       <div className="absolute top-3 right-3">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleRemoveFromWishlist(product._id);
                           }}
-                          className="p-2 rounded-full bg-surface-card opacity-90 backdrop-blur-sm hover:bg-surface-card transition-colors duration-200"
+                          className="p-2 rounded-full bg-surface-card/90 hover:bg-surface-card transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary"
+                          aria-label="Remove from wishlist"
                         >
-                          <Heart
-                            className="w-5 h-5 text-error"
-                            fill="currentColor"
-                          />
+                          <Heart className="w-5 h-5 text-error" fill="currentColor" />
                         </button>
                       </div>
                       {product.quantity <= 0 && !product.continueSellingWhenOutOfStock && (
@@ -1059,15 +1197,19 @@ export const WishlistSection = ({ session, onAddToCart }) => {
                     <div className="p-5">
                       <div className="flex justify-between items-start mb-2">
                         <h3
-                          className="font-medium text-text-primary line-clamp-1 cursor-pointer"
+                          className="font-medium text-text-primary line-clamp-1 cursor-pointer hover:text-primary transition-colors"
                           onClick={() => handleProductClick(product)}
+                          tabIndex={0}
+                          onKeyDown={(e) => e.key === 'Enter' && handleProductClick(product)}
+                          role="button"
+                          aria-label={`View details for ${product.name}`}
                         >
                           {product.name}
                         </h3>
                         <span className="font-bold text-primary">฿{product.price.toFixed(2)}</span>
                       </div>
-                      <p className="text-sm text-text-muted line-clamp-2 mb-2 min-h-[40px]">
-                        {product.shortDescription || product.description}
+                      <p className="text-sm text-text-muted line-clamp-2 mb-3 min-h-[40px]">
+                        {product.shortDescription || product.description || 'No description available'}
                       </p>
                       <div className="flex items-center mb-4">
                         {[...Array(5)].map((_, i) => (
@@ -1075,61 +1217,77 @@ export const WishlistSection = ({ session, onAddToCart }) => {
                             key={i}
                             className={`w-4 h-4 ${
                               i < Math.round(product.averageRating || 0)
-                                ? "text-warning fill-current"
-                                : "text-text-muted"
+                                ? 'text-warning fill-current'
+                                : 'text-text-muted'
                             }`}
                           />
                         ))}
                         <span className="ml-2 text-xs text-text-secondary">
-                          ({product.averageRating?.toFixed(1) || "0"})
+                          ({product.averageRating?.toFixed(1) || '0'})
                         </span>
                       </div>
 
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => handleAddToCart(product)}
-                        disabled={product.quantity <= 0 && !product.continueSellingWhenOutOfStock}
-                        className={`w-full flex items-center justify-center px-4 py-2 rounded-full transition-colors duration-200 ${
-                          isProductInCart(product._id)
-                            ? "bg-primary-dark text-text-inverted"
-                            : product.quantity <= 0 && !product.continueSellingWhenOutOfStock
-                            ? "bg-background-secondary text-text-muted cursor-not-allowed"
-                            : "bg-primary text-text-inverted hover:bg-primary-dark"
-                        }`}
-                      >
-                        {isProductInCart(product._id) ? (
-                          <>
-                            <ShoppingBag className="w-4 h-4" />
-                            <span className="text-xs mr-1">{getProductQuantityInCart(product._id)}</span>
-                            <span className="text-sm">In Cart</span>
-                          </>
-                        ) : (
-                          <>
-                            <ShoppingBag className="w-4 h-4 mr-1" />
-                            <span className="text-sm">Add To Cart</span>
-                          </>
-                        )}
-                      </motion.button>
+                      <div className="flex gap-2">
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleAddToCart(product)}
+                          disabled={product.quantity <= 0 && !product.continueSellingWhenOutOfStock}
+                          className={`flex-1 flex items-center justify-center px-4 py-2 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary ${
+                            isProductInCart(product._id)
+                              ? 'bg-primary-dark text-text-inverted'
+                              : product.quantity <= 0 && !product.continueSellingWhenOutOfStock
+                              ? 'bg-error/10 text-error cursor-not-allowed'
+                              : 'bg-primary text-text-inverted hover:bg-primary-dark'
+                          }`}
+                          aria-label={isProductInCart(product._id) ? 'View in cart' : 'Add to cart'}
+                        >
+                          {isProductInCart(product._id) ? (
+                            <>
+                              <ShoppingBag className="w-4 h-4 mr-1" />
+                              <span className="text-xs mr-1">{getProductQuantityInCart(product._id)}</span>
+                              <span className="text-sm">In Cart</span>
+                            </>
+                          ) : (
+                            <>
+                              <ShoppingBag className="w-4 h-4 mr-1" />
+                              <span className="text-sm">Add To Cart</span>
+                            </>
+                          )}
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleRemoveFromWishlist(product._id)}
+                          className="px-3 py-2 border border-border-primary rounded-full hover:bg-background-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
+                          aria-label="Remove from wishlist"
+                        >
+                          <FaHeart className="w-4 h-4 text-error" />
+                        </motion.button>
+                      </div>
                     </div>
                   </motion.div>
                 );
               })}
             </motion.div>
 
-            <Pagination
-              currentPage={pagination.page}
-              totalPages={pagination.totalPages}
-              onPageChange={changePage}
-            />
+            <div className="mt-6 flex justify-center">
+              <Pagination
+                currentPage={pagination.page}
+                totalPages={pagination.totalPages}
+                onPageChange={changePage}
+              />
+            </div>
           </>
         ) : (
           <EmptyState
             icon={FaHeart}
             title="Your Wishlist is Empty"
             description="Save items you love to your wishlist and find them here."
-            actionText="Browse Products"
-            onAction={() => router.push("/")}
+            action={{
+              label: 'Browse Products',
+              onClick: () => router.push('/'),
+            }}
           />
         )}
       </Card>
@@ -1146,16 +1304,13 @@ export const WishlistSection = ({ session, onAddToCart }) => {
 };
 
 export const ReviewsSection = ({ session }) => {
-  const { reviews, isLoading, isError, pagination, changePage } = useUserReviews();
+  const { reviews, isLoading, isError, pagination, changePage, refetch } = useUserReviews();
   const router = useRouter();
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
   const [editReviewModalOpen, setEditReviewModalOpen] = useState(false);
   const [selectedReview, setSelectedReview] = useState(null);
 
-  // Validate ObjectId format
-  const isValidObjectId = (id) => {
-    return /^[0-9a-fA-F]{24}$/.test(id);
-  };
+  const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(id);
 
   const requestSort = (key) => {
     let direction = 'ascending';
@@ -1181,23 +1336,13 @@ export const ReviewsSection = ({ session }) => {
         if (sortConfig.key === 'createdAt') {
           const dateA = new Date(a.createdAt);
           const dateB = new Date(b.createdAt);
-          
-          if (sortConfig.direction === 'ascending') {
-            return dateA - dateB;
-          }
-          return dateB - dateA;
+          return sortConfig.direction === 'ascending' ? dateA - dateB : dateB - dateA;
         } else if (sortConfig.key === 'rating') {
-          if (sortConfig.direction === 'ascending') {
-            return a.rating - b.rating;
-          }
-          return b.rating - a.rating;
+          return sortConfig.direction === 'ascending' ? a.rating - b.rating : b.rating - a.rating;
         } else if (sortConfig.key === 'productId.name') {
           const nameA = a.productId?.name || '';
           const nameB = b.productId?.name || '';
-          if (sortConfig.direction === 'ascending') {
-            return nameA.localeCompare(nameB);
-          }
-          return nameB.localeCompare(nameA);
+          return sortConfig.direction === 'ascending' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameB);
         } else {
           if (a[sortConfig.key] < b[sortConfig.key]) {
             return sortConfig.direction === 'ascending' ? -1 : 1;
@@ -1213,17 +1358,17 @@ export const ReviewsSection = ({ session }) => {
   }, [reviews, sortConfig]);
 
   const handleEditReview = (review) => {
-    if (!review?.productId?._id || !review?._id) {
-      toast.error("Cannot edit review: Invalid product or review information");
+    if (!review?.productId?._id || !review?._id || !isValidObjectId(review._id)) {
+      toast.error('Cannot edit review: Invalid product or review information');
       return;
     }
 
     setSelectedReview({
       _id: review.productId._id,
-      name: review.productId.name || "Unknown Product",
+      name: review.productId.name || 'Unknown Product',
       images: review.productId.images?.length > 0 
         ? review.productId.images 
-        : [{ url: "/images/placeholder.jpg" }],
+        : [{ url: '/images/placeholder.jpg' }],
       reviewId: review._id,
       orderId: review.orderId,
       initialRating: review.rating,
@@ -1236,52 +1381,52 @@ export const ReviewsSection = ({ session }) => {
 
   const reviewColumns = [
     {
-      header: "Product",
-      accessor: "productId",
+      header: 'Product',
+      accessor: 'productId',
       render: (row) => (
         <div className="flex items-center">
           <div className="h-10 w-10 flex-shrink-0 relative rounded-md overflow-hidden">
             <Image
-              src={row.productId?.images?.[0]?.url || "/images/placeholder.jpg"}
-              alt={row.productId?.name || "Product"}
+              src={row.productId?.images?.[0]?.url || '/images/placeholder.jpg'}
+              alt={row.productId?.name || 'Product'}
               fill
               className="object-cover"
             />
           </div>
           <div className="ml-4">
-            <div className="text-sm font-medium text-text-primary">{row.productId?.name || "Unknown Product"}</div>
+            <div className="text-sm font-medium text-text-primary">{row.productId?.name || 'Unknown Product'}</div>
           </div>
         </div>
       ),
       sortable: true,
-      onClick: () => requestSort("productId.name"),
+      onClick: () => requestSort('productId.name'),
       headerContent: () => (
-        <>Product {getSortIcon("productId.name")}</>
-      )
+        <>Product {getSortIcon('productId.name')}</>
+      ),
     },
     {
-      header: "Rating",
-      accessor: "rating",
+      header: 'Rating',
+      accessor: 'rating',
       render: (row) => (
         <div className="flex items-center">
           {[1, 2, 3, 4, 5].map((star) => (
             <FaStar
               key={star}
-              className={star <= row.rating ? "text-yellow-400" : "text-gray-300"}
+              className={star <= row.rating ? 'text-yellow-400' : 'text-gray-300'}
               size={16}
             />
           ))}
         </div>
       ),
       sortable: true,
-      onClick: () => requestSort("rating"),
+      onClick: () => requestSort('rating'),
       headerContent: () => (
-        <>Rating {getSortIcon("rating")}</>
-      )
+        <>Rating {getSortIcon('rating')}</>
+      ),
     },
     {
-      header: "Review",
-      accessor: "comment",
+      header: 'Review',
+      accessor: 'comment',
       render: (row) => (
         <div>
           {row.title && <div className="font-medium">{row.title}</div>}
@@ -1304,45 +1449,39 @@ export const ReviewsSection = ({ session }) => {
       ),
     },
     {
-      header: "Status",
-      accessor: "status",
+      header: 'Status',
+      accessor: 'status',
       render: (row) => (
         <Badge
-          color={
-            row.status === "approved"
-              ? "success"
-              : row.status === "pending"
-              ? "warning"
-              : "error"
-          }
+          color={row.status === 'show' ? 'success' : 'error'}
         >
           {row.status}
         </Badge>
       ),
       sortable: true,
-      onClick: () => requestSort("status"),
+      onClick: () => requestSort('status'),
       headerContent: () => (
-        <>Status {getSortIcon("status")}</>
-      )
+        <>Status {getSortIcon('status')}</>
+      ),
     },
     {
-      header: "Date",
-      accessor: "createdAt",
+      header: 'Date',
+      accessor: 'createdAt',
       render: (row) => new Date(row.createdAt).toLocaleDateString(),
       sortable: true,
-      onClick: () => requestSort("createdAt"),
+      onClick: () => requestSort('createdAt'),
       headerContent: () => (
-        <>Date {getSortIcon("createdAt")}</>
-      )
+        <>Date {getSortIcon('createdAt')}</>
+      ),
     },
     {
-      header: "Actions",
-      accessor: "actions",
+      header: 'Actions',
+      accessor: 'actions',
       render: (row) => (
         <button
           onClick={() => handleEditReview(row)}
           className="text-primary hover:text-primary-dark text-sm"
-          disabled={row.status !== "approved" && row.status !== "pending"}
+          disabled={row.status !== 'show'}
         >
           Edit
         </button>
@@ -1351,7 +1490,7 @@ export const ReviewsSection = ({ session }) => {
   ];
 
   if (isLoading) {
-    return <LoadingSpinner />;
+    return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div></div>;
   }
 
   if (isError) {
@@ -1359,7 +1498,7 @@ export const ReviewsSection = ({ session }) => {
       <div className="text-center py-8">
         <p className="text-error mb-4">Failed to load reviews</p>
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => refetch()}
           className="px-4 py-2 bg-primary text-text-inverted rounded-lg hover:bg-primary-dark transition-colors duration-300"
         >
           Retry
@@ -1370,39 +1509,44 @@ export const ReviewsSection = ({ session }) => {
 
   return (
     <>
-      <SectionHeader title="Your Reviews" />
+      <SectionHeader title="Your Reviews" description="View and manage your product reviews" />
       <Card>
         {reviews?.length > 0 ? (
           <>
             <DataTable
               columns={reviewColumns}
               data={sortedReviews}
+              keyField="_id"
               emptyMessage="You haven't written any reviews yet."
             />
-            <Pagination
-              currentPage={pagination.page}
-              totalPages={pagination.totalPages}
-              onPageChange={changePage}
-            />
+            <div className="mt-4 flex justify-center">
+              <Pagination
+                currentPage={pagination.page}
+                totalPages={pagination.totalPages}
+                onPageChange={changePage}
+              />
+            </div>
           </>
         ) : (
           <EmptyState
             icon={FaStar}
             title="No Reviews Yet"
             description="Your reviews will appear here after you review purchased products."
-            actionText="Browse Products"
-            onAction={() => router.push("/")}
+            action={{ 
+              label: 'Browse Products',
+              onClick: () => router.push('/'),
+            }}
           />
         )}
       </Card>
 
-      {/* Edit Review Modal */}
       {editReviewModalOpen && selectedReview && (
         <ReviewModal
           isOpen={editReviewModalOpen}
           onClose={() => {
             setEditReviewModalOpen(false);
             setSelectedReview(null);
+            refetch();
           }}
           product={{
             _id: selectedReview._id,
@@ -1418,6 +1562,7 @@ export const ReviewsSection = ({ session }) => {
           }}
           isEditMode={true}
           reviewId={selectedReview.reviewId}
+          onReviewSubmitted={() => refetch()}
         />
       )}
     </>

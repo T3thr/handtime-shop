@@ -62,8 +62,8 @@ const ReviewSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ['pending', 'approved', 'rejected'],
-      default: 'pending',
+      enum: ['show', 'hide'],
+      default: 'show',
     },
   },
   {

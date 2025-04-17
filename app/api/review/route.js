@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import dbConnect from "@/backend/lib/mongodb";
 import Review from "@/backend/models/Review";
 import Product from "@/backend/models/Product";
@@ -44,6 +45,7 @@ export async function GET(request) {
       .skip(skip)
       .limit(limit)
       .populate('userId', 'name avatar')
+      .populate('productId', 'name images')
       .lean();
     
     // If productId is provided, calculate rating distribution
@@ -51,8 +53,8 @@ export async function GET(request) {
     let averageRating = 0;
     
     if (productId) {
-      // Get all reviews for this product (without pagination) to calculate stats
-      const allProductReviews = await Review.find({ productId });
+      // Get all reviews with status 'show' for this product
+      const visibleReviews = await Review.find({ productId, status: 'show' });
       
       // Calculate rating counts
       ratingCounts = {
@@ -60,7 +62,7 @@ export async function GET(request) {
       };
       
       let totalRating = 0;
-      allProductReviews.forEach(review => {
+      visibleReviews.forEach(review => {
         const rating = Math.floor(review.rating);
         if (rating >= 1 && rating <= 5) {
           ratingCounts[rating] += 1;
@@ -69,8 +71,8 @@ export async function GET(request) {
       });
       
       // Calculate average rating
-      averageRating = allProductReviews.length > 0 
-        ? parseFloat((totalRating / allProductReviews.length).toFixed(1)) 
+      averageRating = visibleReviews.length > 0 
+        ? parseFloat((totalRating / visibleReviews.length).toFixed(1)) 
         : 0;
     }
     
@@ -99,12 +101,27 @@ export async function POST(request) {
     await dbConnect();
     
     const data = await request.json();
+    console.log('Review submission data:', data);
+    console.log('Session user:', session.user);
     
     // Validate required fields
     if (!data.productId || !data.orderId || !data.rating) {
       return NextResponse.json({ 
         error: "Product ID, Order ID, and rating are required" 
       }, { status: 400 });
+    }
+
+    // Validate IDs
+    if (!mongoose.Types.ObjectId.isValid(data.productId)) {
+      return NextResponse.json({ error: "Invalid product ID format" }, { status: 400 });
+    }
+    if (!mongoose.Types.ObjectId.isValid(data.orderId)) {
+      return NextResponse.json({ error: "Invalid order ID format" }, { status: 400 });
+    }
+
+    // Validate rating
+    if (!Number.isInteger(data.rating) || data.rating < 1 || data.rating > 5) {
+      return NextResponse.json({ error: "Rating must be an integer between 1 and 5" }, { status: 400 });
     }
     
     // Check if user already reviewed this product from this order
@@ -120,61 +137,68 @@ export async function POST(request) {
       }, { status: 400 });
     }
     
+    // Verify product exists
+    const product = await Product.findById(data.productId);
+    if (!product) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    // Initialize reviews array if undefined
+    if (!product.reviews) {
+      product.reviews = [];
+    }
+
+    // Verify order exists and belongs to user
+    const order = await Order.findById(data.orderId);
+    if (!order || order.userId.toString() !== session.user.id) {
+      return NextResponse.json({ error: "Order not found or not authorized" }, { status: 404 });
+    }
+
     // Create new review
     const review = new Review({
-      ...data,
       userId: session.user.id,
+      productId: data.productId,
+      orderId: data.orderId,
+      rating: data.rating,
+      title: data.title?.trim() || '',
+      comment: data.comment?.trim() || '',
+      images: Array.isArray(data.images) ? data.images : [],
       verifiedPurchase: true,
-      status: 'pending'
+      status: 'show'
     });
     
     await review.save();
     
-    // Update product's review stats
-    const product = await Product.findById(data.productId);
-    if (!product) {
-      return NextResponse.json({ 
-        error: "Product not found" 
-      }, { status: 404 });
-    }
-    
-    // Initialize reviews array if it doesn't exist
-    if (!product.reviews) {
-      product.reviews = [];
-    }
-    
-    // Add review to product's reviews array
+    // Update product's reviews array
     product.reviews.push({
-      userId: session.user.id,
+      userId: new mongoose.Types.ObjectId(session.user.id),
       rating: data.rating,
-      title: data.title,
-      comment: data.comment,
-      images: data.images || [],
+      title: data.title?.trim() || '',
+      comment: data.comment?.trim() || '',
+      images: Array.isArray(data.images) ? data.images : [],
       verifiedPurchase: true,
       createdAt: new Date()
     });
     
-    // Recalculate average rating and review count
-    const total = product.reviews.reduce((sum, review) => sum + review.rating, 0);
-    product.averageRating = product.reviews.length > 0 
-      ? parseFloat((total / product.reviews.length).toFixed(1)) 
-      : 0;
-    product.reviewCount = product.reviews.length;
+    // Recalculate product's average rating and review count based on Review collection
+    const visibleReviews = await Review.find({ productId: data.productId, status: 'show' });
+    const reviewCount = visibleReviews.length;
+    const totalRating = visibleReviews.reduce((sum, r) => sum + r.rating, 0);
+    product.averageRating = reviewCount > 0 ? parseFloat((totalRating / reviewCount).toFixed(1)) : 0;
+    product.reviewCount = reviewCount;
     
     await product.save();
     
     // Update order to mark the product as reviewed
-    const order = await Order.findById(data.orderId);
-    if (order) {
-      // Find the item in the order and update its reviewStatus
-      const itemIndex = order.items.findIndex(item => 
-        item.productId.toString() === data.productId.toString()
-      );
-      
-      if (itemIndex !== -1) {
-        order.items[itemIndex].reviewStatus = true;
-        await order.save();
-      }
+    const itemIndex = order.items.findIndex(item => 
+      item.productId.toString() === data.productId.toString()
+    );
+    
+    if (itemIndex !== -1) {
+      order.items[itemIndex].reviewStatus = true;
+      await order.save();
+    } else {
+      console.warn(`Item with productId ${data.productId} not found in order ${data.orderId}`);
     }
     
     return NextResponse.json({ 

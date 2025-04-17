@@ -36,6 +36,10 @@ const OrderItemSchema = new Schema(
       size: String,
       sku: String,
     },
+    reviewStatus: {
+      type: Boolean,
+      default: false,
+    },
   },
   { _id: false }
 );

@@ -15,6 +15,49 @@ const ImageSchema = new Schema({
   alt: String,
 });
 
+const ReviewSchema = new Schema({
+  userId: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+  rating: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 5,
+  },
+  title: {
+    type: String,
+    trim: true,
+    maxlength: 100,
+  },
+  comment: {
+    type: String,
+    trim: true,
+    maxlength: 500,
+  },
+  images: [
+    {
+      type: String,
+      validate: {
+        validator: function (v) {
+          return v === null || /^(https?:\/\/).+\.(jpg|jpeg|png|webp|gif)$/i.test(v);
+        },
+        message: (props) => `${props.value} is not a valid image URL!`,
+      },
+    },
+  ],
+  verifiedPurchase: {
+    type: Boolean,
+    default: true,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
 const ProductSchema = new Schema(
   {
     name: {
@@ -68,6 +111,7 @@ const ProductSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    reviews: [ReviewSchema],
     averageRating: {
       type: Number,
       default: 0,

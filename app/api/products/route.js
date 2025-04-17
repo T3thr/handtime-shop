@@ -6,7 +6,7 @@ export async function GET() {
   try {
     await dbConnect();
     const products = await Product.find({ status: 'active' })
-      .select('name slug description price images categories averageRating reviewCount')
+      .select('name slug description price images categories averageRating reviewCount quantity continueSellingWhenOutOfStock')
       .lean();
     return NextResponse.json(products);
   } catch (error) {

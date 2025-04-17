@@ -6,7 +6,7 @@ import { useCart } from "@/context/CartContext";
 import ImageSlider from "@/components/contents/ImageSlider";
 import LearnMoreModal from "@/components/contents/LearnMoreModal";
 import CategoryModal from "@/components/contents/CategoryModal";
-import { Heart, ShoppingBag, Filter, Search, X, ChevronRight, ArrowUpRight, Star, Sparkles } from "lucide-react";
+import { Heart, ShoppingBag, Filter, Search, X, ChevronRight, ArrowUpRight, Star } from "lucide-react";
 import { useProducts } from "@/backend/lib/productAction";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,7 +16,6 @@ import Loading from "@/app/loading";
 import { useSidebar } from "@/context/SidebarContext";
 import { useInView } from "react-intersection-observer";
 import { useReviews } from "@/hooks/reviewHooks";
-import { FaStar, FaRegStar, FaStarHalfAlt } from "react-icons/fa";
 
 // Animation variants
 const fadeInUp = {
@@ -34,6 +33,11 @@ const staggerContainer = {
   },
 };
 
+const starVariants = {
+  filled: { scale: 1, opacity: 1, color: "#f59e0b" },
+  empty: { scale: 0.8, opacity: 0.5, color: "#d1d5db" },
+};
+
 export default function Product() {
   const featuredProductsRef = useRef(null);
   const [isLearnMoreModalOpen, setIsLearnMoreModalOpen] = useState(false);
@@ -44,6 +48,7 @@ export default function Product() {
     priceRange: "",
     sortBy: "",
     searchQuery: "",
+    inStockOnly: false, // New filter for in-stock products
   });
   const [categories, setCategories] = useState([]);
   const [mainCategories, setMainCategories] = useState([]);
@@ -55,12 +60,11 @@ export default function Product() {
   const [wishlist, setWishlist] = useState([]);
   const [hoverEffects, setHoverEffects] = useState({});
   const [productReviews, setProductReviews] = useState({});
-
   const { user, lineProfile, status } = useContext(AuthContext);
-  const { addToCart, cartLOWERItems = [], getCartSummary } = useCart();
-  const { products, isLoading: productsLoading, isError } = useProducts();
+  const { addToCart, cartItems = [], getCartSummary } = useCart();
+  const { products, isLoading: productsLoading, isError, mutate: refetchProducts } = useProducts();
   const { openSidebar } = useSidebar();
-  const { getProductReviews } = useReviews();
+  const { useProductReviews } = useReviews();
 
   const [heroRef, heroInView] = useInView({ triggerOnce: true, threshold: 0.1 });
   const [categoriesRef, categoriesInView] = useInView({ triggerOnce: true, threshold: 0.1 });
@@ -87,7 +91,7 @@ export default function Product() {
         const mainCats = allCategories.filter((cat) => cat.priority === "main").slice(0, 4);
         setMainCategories(mainCats);
       } catch (error) {
-        //toast.error("Failed to load categories");
+        // toast.error("Failed to load categories");
       }
     };
 
@@ -124,44 +128,6 @@ export default function Product() {
     };
   }, [products]);
 
-  // Fetch reviews for all products
-  useEffect(() => {
-    const fetchAllProductReviews = async () => {
-      if (!products || products.length === 0) return;
-      
-      const reviewsData = {};
-      
-      for (const product of products) {
-        try {
-          const data = await getProductReviews(product._id);
-          if (data && data.reviews) {
-            // Only use approved reviews
-            const approvedReviews = data.reviews.filter(review => review.status === "approved");
-            
-            // Calculate average rating
-            let averageRating = 0;
-            if (approvedReviews.length > 0) {
-              const total = approvedReviews.reduce((sum, review) => sum + review.rating, 0);
-              averageRating = total / approvedReviews.length;
-            }
-            
-            reviewsData[product._id] = {
-              reviews: approvedReviews,
-              averageRating,
-              reviewCount: approvedReviews.length
-            };
-          }
-        } catch (error) {
-          console.error(`Failed to fetch reviews for product ${product._id}:`, error);
-        }
-      }
-      
-      setProductReviews(reviewsData);
-    };
-
-    fetchAllProductReviews();
-  }, [products, getProductReviews]);
-
   const scrollToFeaturedProducts = () => {
     if (featuredProductsRef.current) {
       featuredProductsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -173,6 +139,7 @@ export default function Product() {
 
     let filtered = [...products];
 
+    // Apply search query filter
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase();
       filtered = filtered.filter(
@@ -181,31 +148,47 @@ export default function Product() {
       );
     }
 
+    // Apply category filter
     if (filters.categories.length > 0) {
       filtered = filtered.filter((p) => filters.categories.some((cat) => p.categories.includes(cat)));
     }
 
+    // Apply price range filter
     if (filters.priceRange) {
       const [min, max] = filters.priceRange.split("-").map(Number);
       filtered = filtered.filter((p) => p.price >= min && p.price <= max);
     }
 
-    if (filters.sortBy) {
-      filtered.sort((a, b) => {
+    // Apply in-stock only filter
+    if (filters.inStockOnly) {
+      filtered = filtered.filter((p) => p.quantity > 0 || p.continueSellingWhenOutOfStock);
+    }
+
+    // Sort products (out-of-stock products to the bottom)
+    filtered.sort((a, b) => {
+      const aOutOfStock = a.quantity <= 0 && !a.continueSellingWhenOutOfStock;
+      const bOutOfStock = b.quantity <= 0 && !b.continueSellingWhenOutOfStock;
+
+      // Push out-of-stock products to the bottom
+      if (aOutOfStock && !bOutOfStock) return 1;
+      if (!aOutOfStock && bOutOfStock) return -1;
+
+      // Apply user-selected sorting
+      if (filters.sortBy) {
         if (filters.sortBy === "price-asc") return a.price - b.price;
         if (filters.sortBy === "price-desc") return b.price - a.price;
         if (filters.sortBy === "name") return a.name.localeCompare(b.name);
         if (filters.sortBy === "rating") {
-          const aRating = productReviews[a._id]?.averageRating || 0;
-          const bRating = productReviews[b._id]?.averageRating || 0;
+          const aRating = a.averageRating || 0;
+          const bRating = b.averageRating || 0;
           return bRating - aRating;
         }
-        return 0;
-      });
-    }
+      }
+      return 0;
+    });
 
     return filtered;
-  }, [products, filters, productReviews]);
+  }, [products, filters]);
 
   const handleAddToCart = async (product, e) => {
     e.stopPropagation();
@@ -271,7 +254,7 @@ export default function Product() {
     
     setSelectedProduct({
       ...product,
-      images: product.images || [], // Ensure images exists
+      images: product.images || [],
       averageRating: reviewData.averageRating,
       reviewCount: reviewData.reviewCount,
       reviews: reviewData.reviews
@@ -279,12 +262,12 @@ export default function Product() {
   };
 
   const isProductInCart = (productId) => {
-    return Array.isArray(cartLOWERItems) && cartLOWERItems.some((item) => item.productId === productId);
+    return Array.isArray(cartItems) && cartItems.some((item) => item.productId === productId);
   };
 
   const getProductQuantityInCart = (productId) => {
-    if (!Array.isArray(cartLOWERItems)) return 0;
-    const item = cartLOWERItems.find((item) => item.productId === productId);
+    if (!Array.isArray(cartItems)) return 0;
+    const item = cartItems.find((item) => item.productId === productId);
     return item ? item.quantity : 0;
   };
 
@@ -343,13 +326,28 @@ export default function Product() {
     { label: "Top Rated", value: "rating" },
   ];
 
-  const renderStars = (rating) => {
+  const renderStars = (rating, isLoading) => {
+    if (isLoading) {
+      return (
+        <div className="flex items-center space-x-1">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="w-4 h-4 bg-gray-200 animate-pulse rounded-full" />
+          ))}
+        </div>
+      );
+    }
+
     return (
-      <div className="flex">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <span key={star} className="text-yellow-400">
-            {star <= Math.round(rating) ? <FaStar size={12} /> : <FaRegStar size={12} />}
-          </span>
+      <div className="flex items-center">
+        {[...Array(5)].map((_, i) => (
+          <motion.div
+            key={i}
+            variants={starVariants}
+            animate={i < Math.round(rating) ? "filled" : "empty"}
+            transition={{ duration: 0.3 }}
+          >
+            <Star className="w-4 h-4" fill={i < Math.round(rating) ? "currentColor" : "none"} />
+          </motion.div>
         ))}
       </div>
     );
@@ -409,7 +407,6 @@ export default function Product() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 1 }}
           className="absolute inset-0 bg-gradient-to-br from-background-secondary via-primary-40 to-primary-light-80 dark:from-background-secondary dark:via-primary-20 dark:to-primary-dark-40"
         >
           <div className="absolute inset-0 bg-[url('/images/pattern.svg')] bg-repeat bg-center opacity-20"></div>
@@ -460,6 +457,7 @@ export default function Product() {
               <motion.button
                 whileHover={{ scale: 1.03, boxShadow: "0 10px 15px -3px rgba(15, 118, 110, 0.2)" }}
                 whileTap={{ scale: 0.97 }}
+                PMID="explore-collection"
                 onClick={scrollToFeaturedProducts}
                 className="btn-primary bg-primary text-text-inverted hover:bg-primary-dark transition-all duration-300 flex items-center justify-center group"
               >
@@ -470,6 +468,7 @@ export default function Product() {
               <motion.button
                 whileHover={{ scale: 1.03, backgroundColor: "rgba(255, 255, 255, 0.15)" }}
                 whileTap={{ scale: 0.97 }}
+                PMID="our-story"
                 onClick={() => setIsLearnMoreModalOpen(true)}
                 className="btn-primary bg-surface-card/10 hover:bg-surface-card/20 backdrop-blur-sm transition-all duration-300"
               >
@@ -497,7 +496,7 @@ export default function Product() {
       </section>
 
       <ImageSlider />
-      
+
       {/* Categories Section */}
       <section ref={categoriesRef} className="py-16 md:py-24 bg-background" id="categories">
         <div className="container mx-auto max-w-7xl px-4 lg:px-8">
@@ -609,7 +608,7 @@ export default function Product() {
       {/* Filters Bar */}
       <div
         ref={featuredProductsRef}
-        className="bg-background/95 backdrop-blur-md border-y border-border-primary z-20 transition-all duration-300 sticky"
+        className="bg-background/95 backdrop-blur-md border-y border-border-primary z-20 transition-all duration-300 sticky top-0"
       >
         <div className="container mx-auto max-w-7xl px-4 lg:px-8 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -640,7 +639,7 @@ export default function Product() {
                   onChange={(e) => setFilters((prev) => ({ ...prev, searchQuery: e.target.value }))}
                   className="pl-9 pr-3 py-2 bg-container text-foreground rounded-full border border-border-primary bg-surface-card/80 focus:outline-none focus:ring-2 focus:ring-primary text-sm w-full sm:w-64 transition-all duration-300 focus:w-72"
                 />
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-text-muted group-hover:text-primary transition-colors duration-200" />
+                <Search className="absolute left-3 top-1/2 transform -translate Y-1/2 h-4 w-4 text-text-muted group-hover:text-primary transition-colors duration-200" />
                 {filters.searchQuery && (
                   <motion.button
                     initial={{ scale: 0.8, opacity: 0 }}
@@ -773,12 +772,28 @@ export default function Product() {
                   </div>
                 </div>
 
+                <div>
+                  <h4 className="text-sm font-medium mb-2 text-text-secondary">Availability</h4>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="inStockOnly"
+                      checked={filters.inStockOnly}
+                      onChange={(e) => setFilters((prev) => ({ ...prev, inStockOnly: e.target.checked }))}
+                      className="h-4 w-4 text-primary border-border-primary rounded focus:ring-primary"
+                    />
+                    <label htmlFor="inStockOnly" className="text-sm text-text-secondary">
+                      In Stock Only
+                    </label>
+                  </div>
+                </div>
+
                 <div className="col-span-1 sm:col-span-2 lg:col-span-4 flex justify-end">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => {
-                      setFilters({ categories: [], priceRange: "", sortBy: "", searchQuery: "" });
+                      setFilters({ categories: [], priceRange: "", sortBy: "", searchQuery: "", inStockOnly: false });
                       setShowFilters(false);
                     }}
                     className="text-sm text-text-muted hover:text-primary transition-colors duration-200 flex items-center"
@@ -793,8 +808,8 @@ export default function Product() {
         </div>
       </div>
 
-       {/* Products Section */}
-       <section
+      {/* Products Section */}
+      <section
         ref={productsRef}
         className="py-12 md:py-20 bg-gradient-to-b from-background to-background-secondary/50 dark:from-background dark:to-background-secondary/20"
       >
@@ -807,13 +822,13 @@ export default function Product() {
           >
             <div className="space-y-2">
               <h2 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
-                {filters.searchQuery || filters.categories.length > 0 ? "Filtered Products" : "Handcrafted Collection"}
+                {filters.searchQuery || filters.categories.length > 0 || filters.inStockOnly ? "Filtered Products" : "Handcrafted Collection"}
               </h2>
               <p
                 className="text-text-secondary"
                 data-search-term="discover our handpicked artisanal treasures"
               >
-                {filters.searchQuery || filters.categories.length > 0 || filters.priceRange
+                {filters.searchQuery || filters.categories.length > 0 || filters.priceRange || filters.inStockOnly
                   ? `Showing ${displayedProducts.length} result${displayedProducts.length !== 1 ? "s" : ""}`
                   : "Discover our handpicked artisanal treasures"}
               </p>
@@ -840,7 +855,7 @@ export default function Product() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => setFilters({ categories: [], priceRange: "", sortBy: "", searchQuery: "" })}
+                onClick={() => setFilters({ categories: [], priceRange: "", sortBy: "", searchQuery: "", inStockOnly: false })}
                 className="btn-primary bg-primary hover:bg-primary-dark inline-flex items-center"
               >
                 <X className="h-4 w-4 mr-2" />
@@ -855,124 +870,122 @@ export default function Product() {
                 animate={productsInView ? "visible" : "hidden"}
                 className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6"
               >
-                {displayedProducts.slice(0, visibleProducts).map((product, index) => (
-                  <motion.div
-                    key={product._id}
-                    id={`product-${product._id}`}
-                    variants={fadeInUp}
-                    transition={{ duration: 0.3, delay: index * 0.05 }}
-                    whileHover={{ y: -5 }}
-                    className="group relative bg-surface-card rounded-xl shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md"
-                  >
-                    <div
-                      className="aspect-square relative overflow-hidden cursor-pointer"
-                      onClick={() => handleProductClick(product)}
+                {displayedProducts.slice(0, visibleProducts).map((product, index) => {
+                  const isOutOfStock = product.quantity <= 0 && !product.continueSellingWhenOutOfStock;
+
+                  return (
+                    <motion.div
+                      key={product._id}
+                      id={`product-${product._id}`}
+                      variants={fadeInUp}
+                      transition={{ duration: 0.3, delay: index * 0.05 }}
+                      whileHover={{ y: -5 }}
+                      className={`group relative bg-surface-card rounded-xl shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md ${
+                        isOutOfStock ? "opacity-60" : ""
+                      }`}
                     >
-                      <Image
-                        src={product.images[0]?.url || "/images/placeholder.jpg"}
-                        alt={product.name}
-                        fill
-                        className="object-cover transition-transform duration-500 group-hover:scale-105"
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                      <div className="absolute top-3 right-3">
-                        <button
-                          onClick={(e) => handleWishlist(product._id, e)}
-                          className="p-2 rounded-full bg-surface-card opacity-90 backdrop-blur-sm hover:bg-surface-card transition-colors duration-200"
-                        >
-                          <Heart
-                            className={`w-5 h-5 ${
-                              isProductInWishlist(product._id)
-                                ? "text-error"
-                                : "text-text-secondary hover:text-primary"
-                            }`}
-                            fill={isProductInWishlist(product._id) ? "currentColor" : "none"}
-                          />
-                        </button>
-                      </div>
-                      {product.quantity <= 0 && !product.continueSellingWhenOutOfStock && (
-                        <div className="absolute top-0 left-0 w-full bg-error/90 text-text-inverted text-center py-1 text-sm font-medium">
-                          Out of Stock
+                      <div
+                        className="aspect-square relative overflow-hidden cursor-pointer"
+                        onClick={() => handleProductClick(product)}
+                      >
+                        <Image
+                          src={product.images[0]?.url || "/images/placeholder.jpg"}
+                          alt={product.name}
+                          fill
+                          className="object-cover transition-transform duration-500 group-hover:scale-105"
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        <div className="absolute top-3 right-3">
+                          <button
+                            onClick={(e) => handleWishlist(product._id, e)}
+                            className="p-2 rounded-full bg-surface-card opacity-90 backdrop-blur-sm hover:bg-surface-card transition-colors duration-200"
+                          >
+                            <Heart
+                              className={`w-5 h-5 ${
+                                isProductInWishlist(product._id)
+                                  ? "text-error"
+                                  : "text-text-secondary hover:text-primary"
+                              }`}
+                              fill={isProductInWishlist(product._id) ? "currentColor" : "none"}
+                            />
+                          </button>
                         </div>
-                      )}
-                    </div>
+                        {isOutOfStock && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl">
+                            <div className="bg-error/90 text-text-inverted text-center py-2 px-4 rounded-lg">
+                              <p className="text-sm font-medium">Out of Stock</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
-                    <div className="p-5">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3
-                          className="font-medium text-text-primary line-clamp-1 cursor-pointer"
-                          onClick={() => handleProductClick(product)}
-                          data-search-term={product.name.toLowerCase()}
+                      <div className="p-5">
+                        <div className="flex justify-between items-start mb-2">
+                          <h3
+                            className="font-medium text-text-primary line-clamp-1 cursor-pointer"
+                            onClick={() => handleProductClick(product)}
+                            data-search-term={product.name.toLowerCase()}
+                          >
+                            {product.name}
+                          </h3>
+                          <span className="font-bold text-primary">฿{product.price.toFixed(2)}</span>
+                        </div>
+                        <p
+                          className="text-sm text-text-muted line-clamp-2 mb-2 min-h-[40px]"
+                          data-search-term={product.shortDescription?.toLowerCase() || product.description.toLowerCase()}
                         >
-                          {product.name}
-                        </h3>
-                        <span className="font-bold text-primary">฿{product.price.toFixed(2)}</span>
-                      </div>
-                      <p
-                        className="text-sm text-text-muted line-clamp-2 mb-2 min-h-[40px]"
-                        data-search-term={product.shortDescription?.toLowerCase() || product.description.toLowerCase()}
-                      >
-                        {product.shortDescription || product.description}
-                      </p>
-                      <div className="flex items-center mb-4">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`w-4 h-4 ${
-                              i < Math.round(productReviews[product._id]?.averageRating || product.averageRating || 0)
-                                ? "text-warning fill-current"
-                                : "text-text-muted"
-                            }`}
-                          />
-                        ))}
-                        <span className="ml-2 text-xs text-text-secondary">
-                          {productReviews[product._id] 
-                            ? `(${productReviews[product._id].averageRating.toFixed(1)}) ${productReviews[product._id].reviewCount} reviews`
-                            : product.averageRating 
-                              ? `(${product.averageRating.toFixed(1)})`
-                              : "(0)"
-                          }
-                        </span>
-                      </div>
+                          {product.shortDescription || product.description}
+                        </p>
+                        <div className="flex items-center mb-4">
+                          {renderStars(product.averageRating || 0, productsLoading)}
+                          <span className="ml-2 text-xs text-text-secondary">
+                            {productsLoading
+                              ? ""
+                              : product.averageRating
+                              ? `(${product.averageRating.toFixed(1)}) ${product.reviewCount} reviews`
+                              : "(0)"}
+                          </span>
+                        </div>
 
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={(e) => handleAddToCart(product, e)}
-                        disabled={product.quantity <= 0 && !product.continueSellingWhenOutOfStock}
-                        className={`w-full flex items-center justify-center px-4 py-2 rounded-full transition-colors duration-200 relative overflow-hidden ${
-                          isProductInCart(product._id)
-                            ? "bg-primary-dark text-text-inverted"
-                            : product.quantity <= 0 && !product.continueSellingWhenOutOfStock
-                            ? "bg-background-secondary text-text-muted cursor-not-allowed"
-                            : "bg-primary text-text-inverted hover:bg-primary-dark"
-                        }`}
-                      >
-                        {isProductInCart(product._id) ? (
-                          <>
-                            <ShoppingBag className="w-4 h-4" />
-                            <span className="text-xs mr-1">{getProductQuantityInCart(product._id)}</span>
-                            <span className="text-sm">In Cart</span>
-                          </>
-                        ) : (
-                          <>
-                            <ShoppingBag className="w-4 h-4 mr-1" />
-                            <span className="text-sm">Add To Cart</span>
-                          </>
-                        )}
-                        {hoverEffects[product._id] && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-primary-light/30"
-                          />
-                        )}
-                      </motion.button>
-                    </div>
-                  </motion.div>
-                ))}
+                        <motion.button
+                          whileHover={{ scale: isOutOfStock ? 1 : 1.05 }}
+                          whileTap={{ scale: isOutOfStock ? 1 : 0.95 }}
+                          onClick={(e) => handleAddToCart(product, e)}
+                          disabled={isOutOfStock}
+                          className={`w-full flex items-center justify-center px-4 py-2 rounded-full transition-colors duration-200 relative overflow-hidden ${
+                            isProductInCart(product._id)
+                              ? "bg-primary-dark text-text-inverted"
+                              : isOutOfStock
+                              ? "bg-background-secondary text-text-muted cursor-not-allowed"
+                              : "bg-primary text-text-inverted hover:bg-primary-dark"
+                          }`}
+                        >
+                          {isProductInCart(product._id) ? (
+                            <>
+                              <ShoppingBag className="w-4 h-4" />
+                              <span className="text-xs mr-1">{getProductQuantityInCart(product._id)}</span>
+                              <span className="text-sm">In Cart</span>
+                            </>
+                          ) : (
+                            <>
+                              <ShoppingBag className="w-4 h-4 mr-1" />
+                              <span className="text-sm">{isOutOfStock ? "Out of Stock" : "Add To Cart"}</span>
+                            </>
+                          )}
+                          {hoverEffects[product._id] && !isOutOfStock && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0 }}
+                              className="absolute inset-0 bg-primary-light/30"
+                            />
+                          )}
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </motion.div>
 
               {hasMoreProducts && (

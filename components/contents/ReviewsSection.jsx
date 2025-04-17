@@ -187,11 +187,9 @@ export const ReviewsSection = ({ session }) => {
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            review.status === "approved" 
+                            review.status === "show" 
                               ? "bg-green-100 text-green-800" 
-                              : review.status === "rejected"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-yellow-100 text-yellow-800"
+                              : "bg-red-100 text-red-800"
                           }`}
                         >
                           {review.status}
@@ -201,6 +199,7 @@ export const ReviewsSection = ({ session }) => {
                         <button
                           onClick={() => handleEditReview(review._id)}
                           className="text-indigo-600 hover:text-indigo-900 mr-3"
+                          disabled={review.status !== "show"}
                         >
                           <FaEdit className="inline" /> Edit
                         </button>

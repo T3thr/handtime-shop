@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 import { Heart, ShoppingBag, X, ChevronLeft, ChevronRight, Star, Share2, MessageSquare } from "lucide-react";
-import { FaStar, FaRegStar, FaStarHalfAlt, FaUser } from "react-icons/fa";
+import { FaUser } from "react-icons/fa";
 import { toast } from "react-toastify";
 import axios from "axios";
 import AuthContext from "@/context/AuthContext";
@@ -19,19 +19,10 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
   const [product, setProduct] = useState(initialProduct);
   const { openSidebar } = useSidebar();
   const [activeTab, setActiveTab] = useState("description");
-  const [reviewsLoaded, setReviewsLoaded] = useState(false);
-  const { getProductReviews    ,reviews, 
-    averageRating, 
-    ratingCounts, 
-    isLoading: reviewsLoading, 
-    pagination, 
-    changePage,
-    total: reviewsTotal } = useReviews();
-  const [ratingDistribution, setRatingDistribution] = useState([0, 0, 0, 0, 0]);
-  const [loading, setLoading] = useState(true);
+  const { reviews, averageRating, ratingCounts, isLoading: reviewsLoading, pagination, changePage, total: reviewsTotal } = useReviews(initialProduct._id);
   const [isInWishlist, setIsInWishlist] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  
   useEffect(() => {
     const loadProductDetails = async () => {
       try {
@@ -66,59 +57,6 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
     loadProductDetails();
     fetchWishlistStatus();
   }, [initialProduct._id, productCache, fetchProductDetails, isAuthenticated]);
-
-  useEffect(() => {
-    // If reviews aren't already loaded from Product.jsx
-    if (!product.reviews && !reviewsLoaded) {
-      const fetchReviews = async () => {
-        try {
-          const data = await getProductReviews(product._id);
-          if (data && data.reviews) {
-            // Only use approved reviews
-            const approvedReviews = data.reviews.filter(review => review.status === "approved");
-            
-            // Calculate average rating
-            let avgRating = 0;
-            if (approvedReviews.length > 0) {
-              const total = approvedReviews.reduce((sum, review) => sum + review.rating, 0);
-              avgRating = total / approvedReviews.length;
-            }
-            
-            // Calculate rating distribution
-            const distribution = [0, 0, 0, 0, 0];
-            approvedReviews.forEach(review => {
-              if (review.rating >= 1 && review.rating <= 5) {
-                distribution[Math.floor(review.rating) - 1]++;
-              }
-            });
-            
-            setRatingDistribution(distribution);
-            setProduct(prev => ({
-              ...prev,
-              reviews: approvedReviews,
-              averageRating: avgRating,
-              reviewCount: approvedReviews.length
-            }));
-            setReviewsLoaded(true);
-          }
-        } catch (error) {
-          console.error("Failed to fetch reviews:", error);
-        }
-      };
-
-      fetchReviews();
-    } else if (product.reviews && !reviewsLoaded) {
-      // Calculate rating distribution from existing reviews
-      const distribution = [0, 0, 0, 0, 0];
-      product.reviews.forEach(review => {
-        if (review.rating >= 1 && review.rating <= 5) {
-          distribution[Math.floor(review.rating) - 1]++;
-        }
-      });
-      setRatingDistribution(distribution);
-      setReviewsLoaded(true);
-    }
-  }, [product._id, product.reviews, reviewsLoaded, getProductReviews]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -222,33 +160,27 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
   };
 
   const renderStars = (rating) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.5;
-    
-    for (let i = 1; i <= 5; i++) {
-      if (i <= fullStars) {
-        stars.push(<FaStar key={i} className="text-yellow-400" />);
-      } else if (i === fullStars + 1 && hasHalfStar) {
-        stars.push(<FaStarHalfAlt key={i} className="text-yellow-400" />);
-      } else {
-        stars.push(<FaRegStar key={i} className="text-yellow-400" />);
-      }
-    }
-    
-    return stars;
+    return (
+      <div className="flex items-center">
+        {[...Array(5)].map((_, i) => (
+          <Star
+            key={i}
+            className={`w-4 h-4 ${i < Math.round(rating) ? "text-yellow-400 fill-current" : "text-gray-300"}`}
+          />
+        ))}
+      </div>
+    );
   };
 
   const formatDate = (dateString) => {
-    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    const options = { year: "numeric", month: "long", day: "numeric" };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
-  const totalReviews = product.reviewCount || 0;
   const getPercentage = (count) => {
-    return totalReviews > 0 ? Math.round((count / totalReviews) * 100) : 0;
+    return reviewsTotal > 0 ? Math.round((count / reviewsTotal) * 100) : 0;
   };
-  
+
   if (loading) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -264,44 +196,45 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm"
           onClick={onClose}
         />
 
-        <div className="flex min-h-full items-center justify-center p-4">
+        <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ type: "spring", damping: 30 }}
-            className="relative w-full max-w-4xl bg-surface-card rounded-2xl shadow-xl overflow-hidden"
+            exit={{ opacity: 0, y: 50 }}
+            transition={{ type: "spring", damping: 25, stiffness: 100 }}
+            className="relative w-full max-w-4xl bg-surface-card rounded-2xl shadow-2xl overflow-hidden sm:max-w-5xl"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 z-10 p-2 rounded-full bg-surface-card/80 backdrop-blur-sm hover:bg-surface-card transition-colors duration-200"
+              className="absolute top-4 right-4 z-20 p-2 rounded-full bg-surface-card/90 backdrop-blur-sm hover:bg-surface-card transition-colors duration-200"
             >
-              <X className="w-5 h-5 text-text-primary" />
+              <X className="w-6 h-6 text-text-primary" />
             </button>
 
             <button
               onClick={onClose}
-              className="md:hidden absolute top-4 left-4 z-10 p-2 rounded-full bg-surface-card/80 backdrop-blur-sm hover:bg-surface-card transition-colors duration-200"
+              className="sm:hidden absolute top-4 left-4 z-20 p-2 rounded-full bg-surface-card/90 backdrop-blur-sm hover:bg-surface-card transition-colors duration-200"
             >
-              <ChevronLeft className="w-5 h-5 text-text-primary" />
+              <ChevronLeft className="w-6 h-6 text-text-primary" />
             </button>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+            <div className="flex flex-col sm:grid sm:grid-cols-2 gap-0 max-h-[90vh]">
+              {/* Image Section */}
               <div className="relative aspect-square bg-background-secondary">
                 <Image
                   src={currentImage.url}
                   alt={product.name}
                   fill
                   className="object-cover"
-                  sizes="(max-width: 768px) 100vw, 50vw"
+                  sizes="(max-width: 640px) 100vw, 50vw"
                 />
                 {product.quantity <= 0 && !product.continueSellingWhenOutOfStock && (
-                  <div className="absolute top-0 left-0 w-full bg-error/90 text-text-inverted text-center py-1 text-sm font-medium">
+                  <div className="absolute top-0 left-0 w-full bg-error/90 text-text-inverted text-center py-2 text-sm font-medium">
                     Out of Stock
                   </div>
                 )}
@@ -309,28 +242,26 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
                   <>
                     <button
                       onClick={handlePrevImage}
-                      className="absolute left-2 top-1/2 transform -translate-y-1/2 p-2 bg-surface-card/80 rounded-full hover:bg-surface-card transition-colors duration-200"
+                      className="absolute left-3 top-1/2 transform -translate-y-1/2 p-2 bg-surface-card/80 rounded-full hover:bg-surface-card transition-colors duration-200"
                     >
                       <ChevronLeft className="w-5 h-5 text-text-primary" />
                     </button>
                     <button
                       onClick={handleNextImage}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 bg-surface-card/80 rounded-full hover:bg-surface-card transition-colors duration-200"
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 p-2 bg-surface-card/80 rounded-full hover:bg-surface-card transition-colors duration-200"
                     >
                       <ChevronRight className="w-5 h-5 text-text-primary" />
                     </button>
                   </>
                 )}
-                
-                {/* Thumbnail Gallery */}
                 {images.length > 1 && (
-                  <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-2">
+                  <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-2 px-4">
                     {images.map((image, index) => (
                       <button
                         key={index}
                         onClick={() => setCurrentImageIndex(index)}
-                        className={`w-12 h-12 rounded-md overflow-hidden border-2 ${
-                          currentImageIndex === index ? 'border-primary' : 'border-transparent'
+                        className={`w-16 h-16 rounded-lg overflow-hidden border-2 transition-all duration-200 ${
+                          currentImageIndex === index ? "border-primary" : "border-transparent opacity-80 hover:opacity-100"
                         }`}
                       >
                         <div className="relative w-full h-full">
@@ -347,44 +278,35 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
                 )}
               </div>
 
-              <div
-                className={`p-6 md:p-8 ${
-                  activeTab === "reviews"
-                    ? "lg:overflow-y-auto lg:max-h-[70vh] scrollbar-thin scrollbar-thumb-primary scrollbar-track-background"
-                    : "lg:overflow-y-visible"
-                }`}
-              >
-                <div className="space-y-4">
+              {/* Content Section */}
+              <div className="p-6 sm:p-8 overflow-y-auto max-h-[90vh] scrollbar-thin scrollbar-thumb-primary scrollbar-track-background">
+                <div className="space-y-6">
                   <h1
-                    className="text-2xl font-bold text-text-primary"
+                    className="text-2xl sm:text-3xl font-bold text-text-primary"
                     data-search-term={product.name}
                   >
                     {product.name}
                   </h1>
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div className="text-2xl font-bold text-primary">
                       ฿{product.price.toFixed(2)}
                       {product.compareAtPrice && (
-                        <span className="ml-2 text-sm text-text-muted line-through">
+                        <span className="ml-3 text-base text-text-muted line-through">
                           ฿{product.compareAtPrice.toFixed(2)}
                         </span>
                       )}
                     </div>
 
                     <div className="flex items-center text-sm text-text-muted">
-                      <div className="flex items-center mr-1">
-                        {renderStars(product.reviews && product.reviews.length > 0 
-                          ? product.averageRating 
-                          : product.averageRating || 0)}
-                      </div>
-                      <span>({product.reviews ? product.reviews.length : product.reviewCount || 0})</span>
+                      {renderStars(averageRating || 0)}
+                      <span className="ml-2">({reviewsTotal || 0})</span>
                     </div>
                   </div>
 
                   {product.shortDescription && (
                     <p
-                      className="text-text-primary"
+                      className="text-text-primary text-base"
                       data-search-term={product.shortDescription}
                     >
                       {product.shortDescription}
@@ -399,46 +321,34 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
 
                   {/* Tabs Navigation */}
                   <div className="border-b border-border-primary">
-                    <div className="flex space-x-4">
-                      <button
-                        onClick={() => setActiveTab("description")}
-                        className={`py-2 px-1 font-medium text-sm border-b-2 transition-colors ${
-                          activeTab === "description" 
-                            ? "border-primary text-primary" 
-                            : "border-transparent text-text-secondary hover:text-text-primary"
-                        }`}
-                      >
-                        Description
-                      </button>
-                      <button
-                        onClick={() => setActiveTab("details")}
-                        className={`py-2 px-1 font-medium text-sm border-b-2 transition-colors ${
-                          activeTab === "details" 
-                            ? "border-primary text-primary" 
-                            : "border-transparent text-text-secondary hover:text-text-primary"
-                        }`}
-                      >
-                        Details
-                      </button>
-                      <button
-                        onClick={() => setActiveTab("reviews")}
-                        className={`py-2 px-1 font-medium text-sm border-b-2 transition-colors ${
-                          activeTab === "reviews" 
-                            ? "border-primary text-primary" 
-                            : "border-transparent text-text-secondary hover:text-text-primary"
-                        }`}
-                      >
-                        Reviews ({product.reviewCount || 0})
-                      </button>
+                    <div className="flex space-x-4 sm:space-x-6">
+                      {["description", "details", "reviews"].map((tab) => (
+                        <button
+                          key={tab}
+                          onClick={() => setActiveTab(tab)}
+                          className={`py-2 px-2 font-medium text-sm border-b-2 transition-colors duration-200 ${
+                            activeTab === tab
+                              ? "border-primary text-primary"
+                              : "border-transparent text-text-secondary hover:text-text-primary"
+                          }`}
+                        >
+                          {tab === "reviews" ? `Reviews (${product.reviewCount || 0})` : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
                   {/* Tab Content */}
-                  <div className="pt-4">
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="pt-4"
+                  >
                     {activeTab === "description" && (
                       <div>
                         <p
-                          className="text-text-secondary"
+                          className="text-text-secondary leading-relaxed"
                           data-search-term={product.description}
                         >
                           {product.description}
@@ -447,262 +357,335 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
                     )}
 
                     {activeTab === "details" && (
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                         {product.categories?.length > 0 && (
                           <div>
-                            <h3 className="text-text-muted">Category</h3>
+                            <h3 className="text-text-muted font-medium">Category</h3>
                             <p className="text-text-primary">{product.categories.join(", ")}</p>
                           </div>
                         )}
                         {product.vendor && (
                           <div>
-                            <h3 className="text-text-muted">Vendor</h3>
+                            <h3 className="text-text-muted font-medium">Vendor</h3>
                             <p className="text-text-primary">{product.vendor}</p>
                           </div>
                         )}
                         {product.sku && (
                           <div>
-                            <h3 className="text-text-muted">SKU</h3>
+                            <h3 className="text-text-muted font-medium">SKU</h3>
                             <p className="text-text-primary">{product.sku}</p>
                           </div>
                         )}
                         {product.weight && (
                           <div>
-                            <h3 className="text-text-muted">Weight</h3>
+                            <h3 className="text-text-muted font-medium">Weight</h3>
                             <p className="text-text-primary">{product.weight} {product.weightUnit}</p>
                           </div>
                         )}
                         {product.dimensions && (
                           <div>
-                            <h3 className="text-text-muted">Dimensions</h3>
+                            <h3 className="text-text-muted font-medium">Dimensions</h3>
                             <p className="text-text-primary">{product.dimensions}</p>
                           </div>
                         )}
                         {product.materials && (
                           <div>
-                            <h3 className="text-text-muted">Materials</h3>
+                            <h3 className="text-text-muted font-medium">Materials</h3>
                             <p className="text-text-primary">{product.materials}</p>
                           </div>
                         )}
                       </div>
                     )}
 
-                {activeTab === "reviews" && (
-                  <div className="space-y-6">
-                    {/* Reviews Summary */}
-                    <div className="flex flex-col md:flex-row gap-6 border-b border-border-primary pb-6">
-                      <div className="flex flex-col items-center justify-center">
-                        <div className="text-4xl font-bold text-text-primary">
-                          {averageRating ? averageRating.toFixed(1) : "0.0"}
-                        </div>
-                        <div className="flex mt-2">{renderStars(averageRating || 0)}</div>
-                        <div className="text-sm text-text-secondary mt-1">
-                          {reviewsTotal || 0} {reviewsTotal === 1 ? "review" : "reviews"}
-                        </div>
-                      </div>
-
-                      <div className="flex-1">
-                        {[5, 4, 3, 2, 1].map((rating) => (
-                          <div key={rating} className="flex items-center mb-2">
-                            <div className="flex items-center w-16">
-                              <span className="text-sm text-text-secondary mr-1">{rating}</span>
-                              <FaStar className="text-yellow-400 text-sm" />
+                    {activeTab === "reviews" && (
+                      <div className="space-y-8">
+                        {/* Reviews Summary */}
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ duration: 0.5 }}
+                          className="flex flex-col sm:flex-row gap-6 border-b border-border-primary pb-6"
+                        >
+                          <div className="flex flex-col items-center justify-center w-full sm:w-1/3">
+                            <div className="text-4xl font-bold text-text-primary">
+                              {reviewsLoading ? (
+                                <div className="w-16 h-10 bg-gray-200 animate-pulse rounded" />
+                              ) : (
+                                averageRating ? averageRating.toFixed(1) : "0.0"
+                              )}
                             </div>
-                            <div className="flex-1 h-2 bg-background-secondary rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-yellow-400 rounded-full"
-                                style={{ width: `${ratingDistribution[rating]}%` }}
-                              ></div>
+                            <div className="flex mt-2">
+                              {reviewsLoading ? (
+                                <div className="flex space-x-1">
+                                  {[...Array(5)].map((_, i) => (
+                                    <div key={i} className="w-5 h-5 bg-gray-200 animate-pulse rounded" />
+                                  ))}
+                                </div>
+                              ) : (
+                                renderStars(averageRating || 0)
+                              )}
                             </div>
-                            <div className="w-12 text-right text-sm text-text-secondary">
-                              {ratingCounts && ratingCounts[rating] ? ratingCounts[rating] : 0}
+                            <div className="text-sm text-text-secondary mt-1">
+                              {reviewsLoading ? (
+                                <div className="w-24 h-4 bg-gray-200 animate-pulse rounded" />
+                              ) : (
+                                `${reviewsTotal || 0} ${reviewsTotal === 1 ? "review" : "reviews"}`
+                              )}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </div>
 
-                    {/* Reviews List */}
-                    {reviewsLoading ? (
-                      <div className="flex justify-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                      </div>
-                    ) : reviews && reviews.length > 0 ? (
-                      <div className="space-y-6">
-                        {reviews.map((review) => (
-                          <div key={review._id} className="border-b border-border-primary pb-6">
-                            <div className="flex justify-between items-start mb-2">
-                              <div className="flex items-center">
-                                <div className="w-10 h-10 rounded-full bg-background-secondary flex items-center justify-center mr-3">
-                                  {review.userId?.avatar ? (
-                                    <Image
-                                      src={review.userId.avatar}
-                                      alt={review.userId.name || "User"}
-                                      width={40}
-                                      height={40}
-                                      className="rounded-full object-cover"
-                                    />
-                                  ) : (
-                                    <FaUser className="text-text-muted" />
-                                  )}
-                                </div>
-                                <div>
-                                  <div className="font-medium text-text-primary">
-                                    {review.userId?.name || "Anonymous"}
-                                  </div>
-                                  <div className="text-xs text-text-secondary">
-                                    {formatDate(review.createdAt)}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex">{renderStars(review.rating)}</div>
-                            </div>
-
-                            {review.title && (
-                              <h4 className="font-medium text-text-primary mb-1">{review.title}</h4>
-                            )}
-                            <p className="text-text-secondary mb-3">{review.comment}</p>
-
-                            {review.images && review.images.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mt-3">
-                                {review.images.map((image, index) => (
-                                  <div
-                                    key={index}
-                                    className="relative w-16 h-16 rounded-md overflow-hidden"
-                                  >
-                                    <Image
-                                      src={image}
-                                      alt={`Review image ${index + 1}`}
-                                      fill
-                                      className="object-cover"
-                                    />
+                          <div className="flex-1">
+                            {reviewsLoading ? (
+                              <div className="space-y-3">
+                                {[...Array(5)].map((_, i) => (
+                                  <div key={i} className="flex items-center">
+                                    <div className="w-16 h-4 bg-gray-200 animate-pulse rounded mr-2" />
+                                    <div className="flex-1 h-3 bg-gray-200 animate-pulse rounded" />
+                                    <div className="w-12 h-4 bg-gray-200 animate-pulse rounded ml-2" />
                                   </div>
                                 ))}
                               </div>
+                            ) : (
+                              [5, 4, 3, 2, 1].map((rating) => (
+                                <div key={rating} className="flex items-center mb-3">
+                                  <div className="flex items-center w-16">
+                                    <span className="text-sm text-text-secondary mr-1">{rating}</span>
+                                    <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                                  </div>
+                                  <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
+                                    <motion.div
+                                      initial={{ width: 0 }}
+                                      animate={{ width: `${getPercentage(ratingCounts[rating] || 0)}%` }}
+                                      transition={{ duration: 0.5 }}
+                                      className="h-full bg-yellow-400 rounded-full"
+                                    />
+                                  </div>
+                                  <div className="w-12 text-right text-sm text-text-secondary">
+                                    {ratingCounts[rating] || 0}
+                                  </div>
+                                </div>
+                              ))
                             )}
+                          </div>
+                        </motion.div>
 
-                            {review.verifiedPurchase && (
-                              <div className="mt-2 text-xs text-success flex items-center">
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  className="h-4 w-4 mr-1"
-                                  viewBox="0 0 20 20"
-                                  fill="currentColor"
-                                >
-                                  <path
-                                    fillRule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                    clipRule="evenodd"
-                                  />
-                                </svg>
-                                Verified Purchase
+                        {/* Reviews List */}
+                        {reviewsLoading ? (
+                          <div className="space-y-6">
+                            {[...Array(3)].map((_, i) => (
+                              <div key={i} className="border-b border-border-primary pb-6">
+                                <div className="flex justify-between items-start mb-3">
+                                  <div className="flex items-center">
+                                    <div className="w-12 h-12 rounded-full bg-gray-200 animate-pulse mr-3" />
+                                    <div className="space-y-2">
+                                      <div className="w-32 h-4 bg-gray-200 animate-pulse rounded" />
+                                      <div className="w-24 h-3 bg-gray-200 animate-pulse rounded" />
+                                    </div>
+                                  </div>
+                                  <div className="flex space-x-1">
+                                    {[...Array(5)].map((_, j) => (
+                                      <div key={j} className="w-5 h-5 bg-gray-200 animate-pulse rounded" />
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <div className="w-3/4 h-4 bg-gray-200 animate-pulse rounded" />
+                                  <div className="w-full h-3 bg-gray-200 animate-pulse rounded" />
+                                  <div className="w-1/2 h-3 bg-gray-200 animate-pulse rounded" />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : reviews && reviews.length > 0 ? (
+                          <div className="space-y-6">
+                            {reviews.map((review) => (
+                              <motion.div
+                                key={review._id}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.3 }}
+                                className="border-b border-border-primary pb-6"
+                              >
+                                <div className="flex justify-between items-start mb-3">
+                                  <div className="flex items-center">
+                                    <div className="w-12 h-12 rounded-full bg-background-secondary flex items-center justify-center mr-3 overflow-hidden">
+                                      {review.userId?.avatar ? (
+                                        <Image
+                                          src={review.userId.avatar}
+                                          alt={review.userId.name || "User"}
+                                          width={48}
+                                          height={48}
+                                          className="object-cover"
+                                        />
+                                      ) : (
+                                        <FaUser className="text-text-muted w-6 h-6" />
+                                      )}
+                                    </div>
+                                    <div>
+                                      <div className="font-medium text-text-primary">
+                                        {review.userId?.name || "Anonymous"}
+                                      </div>
+                                      <div className="text-xs text-text-secondary">
+                                        {formatDate(review.createdAt)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex">{renderStars(review.rating)}</div>
+                                </div>
+
+                                {review.title && (
+                                  <h4 className="font-medium text-text-primary mb-2">{review.title}</h4>
+                                )}
+                                <p className="text-text-secondary leading-relaxed mb-3">{review.comment}</p>
+
+                                {review.images && review.images.length > 0 && (
+                                  <div className="flex flex-wrap gap-3 mt-3">
+                                    {review.images.map((image, index) => (
+                                      <div
+                                        key={index}
+                                        className="relative w-20 h-20 rounded-lg overflow-hidden"
+                                      >
+                                        <Image
+                                          src={image}
+                                          alt={`Review image ${index + 1}`}
+                                          fill
+                                          className="object-cover"
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {review.verifiedPurchase && (
+                                  <div className="mt-3 text-xs text-success flex items-center">
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      className="h-4 w-4 mr-1"
+                                      viewBox="0 0 20 20"
+                                      fill="currentColor"
+                                    >
+                                      <path
+                                        fillRule="evenodd"
+                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                        clipRule="evenodd"
+                                      />
+                                    </svg>
+                                    Verified Purchase
+                                  </div>
+                                )}
+                              </motion.div>
+                            ))}
+
+                            {/* Pagination */}
+                            {pagination && pagination.totalPages > 1 && (
+                              <div className="flex justify-center mt-8">
+                                <div className="flex space-x-2">
+                                  <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => changePage(Math.max(1, pagination.page - 1))}
+                                    disabled={pagination.page === 1}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                                      pagination.page === 1
+                                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                        : "bg-primary text-white hover:bg-primary-dark"
+                                    }`}
+                                  >
+                                    Previous
+                                  </motion.button>
+
+                                  {[...Array(pagination.totalPages)].map((_, i) => {
+                                    const page = i + 1;
+                                    if (
+                                      page === 1 ||
+                                      page === pagination.totalPages ||
+                                      (page >= pagination.page - 1 && page <= pagination.page + 1)
+                                    ) {
+                                      return (
+                                        <motion.button
+                                          key={page}
+                                          whileHover={{ scale: 1.05 }}
+                                          whileTap={{ scale: 0.95 }}
+                                          onClick={() => changePage(page)}
+                                          className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-medium transition-colors duration-200 ${
+                                            pagination.page === page
+                                              ? "bg-primary text-white"
+                                              : "bg-surface-card text-text-primary hover:bg-background-hover"
+                                          }`}
+                                        >
+                                          {page}
+                                        </motion.button>
+                                      );
+                                    } else if (page === 2 || page === pagination.totalPages - 1) {
+                                      return (
+                                        <div
+                                          key={page}
+                                          className="w-10 h-10 flex items-center justify-center text-text-secondary"
+                                        >
+                                          ...
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })}
+
+                                  <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => changePage(Math.min(pagination.totalPages, pagination.page + 1))}
+                                    disabled={pagination.page === pagination.totalPages}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                                      pagination.page === pagination.totalPages
+                                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                        : "bg-primary text-white hover:bg-primary-dark"
+                                    }`}
+                                  >
+                                    Next
+                                  </motion.button>
+                                </div>
                               </div>
                             )}
                           </div>
-                        ))}
-
-                        {/* Pagination */}
-                        {pagination && pagination.totalPages > 1 && (
-                          <div className="flex justify-center mt-6">
-                            <div className="flex space-x-1">
-                              <button
-                                onClick={() => handlePageChange(Math.max(1, pagination.page - 1))}
-                                disabled={pagination.page === 1}
-                                className={`px-3 py-1 rounded-md ${
-                                  pagination.page === 1
-                                    ? "bg-background-secondary text-text-muted cursor-not-allowed"
-                                    : "bg-background-secondary text-text-primary hover:bg-background-hover"
-                                }`}
-                              >
-                                Previous
-                              </button>
-
-                              {[...Array(pagination.totalPages)].map((_, i) => {
-                                const page = i + 1;
-                                // Show current page, first page, last page, and pages around current
-                                if (
-                                  page === 1 ||
-                                  page === pagination.totalPages ||
-                                  (page >= pagination.page - 1 && page <= pagination.page + 1)
-                                ) {
-                                  return (
-                                    <button
-                                      key={page}
-                                      onClick={() => handlePageChange(page)}
-                                      className={`w-8 h-8 flex items-center justify-center rounded-md ${
-                                        pagination.page === page
-                                          ? "bg-primary text-text-inverted"
-                                          : "bg-background-secondary text-text-primary hover:bg-background-hover"
-                                      }`}
-                                    >
-                                      {page}
-                                    </button>
-                                  );
-                                } else if (
-                                  page === 2 ||
-                                  page === pagination.totalPages - 1
-                                ) {
-                                  return (
-                                    <button
-                                      key={page}
-                                      className="w-8 h-8 flex items-center justify-center"
-                                    >
-                                      ...
-                                    </button>
-                                  );
-                                }
-                                return null;
-                              })}
-
-                              <button
-                                onClick={() =>
-                                  handlePageChange(Math.min(pagination.totalPages, pagination.page + 1))
-                                }
-                                disabled={pagination.page === pagination.totalPages}
-                                className={`px-3 py-1 rounded-md ${
-                                  pagination.page === pagination.totalPages
-                                    ? "bg-background-secondary text-text-muted cursor-not-allowed"
-                                    : "bg-background-secondary text-text-primary hover:bg-background-hover"
-                                }`}
-                              >
-                                Next
-                              </button>
-                            </div>
-                          </div>
+                        ) : (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="text-center py-12"
+                          >
+                            <MessageSquare className="w-16 h-16 mx-auto text-text-muted mb-4" />
+                            <h3 className="text-xl font-medium text-text-primary mb-2">No Reviews Yet</h3>
+                            <p className="text-text-secondary">Be the first to review this product</p>
+                          </motion.div>
                         )}
                       </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <MessageSquare className="w-12 h-12 mx-auto text-text-muted mb-2" />
-                        <h3 className="text-lg font-medium text-text-primary mb-1">No Reviews Yet</h3>
-                        <p className="text-text-secondary">
-                          Be the first to review this product
-                        </p>
-                      </div>
                     )}
-                  </div>
-                )}
-                  </div>
+                  </motion.div>
 
-                  <div className="pt-4 flex flex-col sm:flex-row gap-3">
-                    <button
+                  <div className="pt-6 flex flex-col sm:flex-row gap-4">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={handleAddToCart}
                       disabled={product.quantity <= 0 && !product.continueSellingWhenOutOfStock}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium ${
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium text-base transition-colors duration-200 ${
                         product.quantity <= 0 && !product.continueSellingWhenOutOfStock
-                          ? "bg-background-secondary text-text-muted cursor-not-allowed"
+                          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                           : isInCart
-                          ? "bg-green-500 hover:bg-green-600 text-white"
-                          : "bg-primary hover:bg-primary-hover text-white"
+                          ? "bg-green-600 hover:bg-green-700 text-white"
+                          : "bg-primary hover:bg-primary-dark text-white"
                       }`}
                     >
                       <ShoppingBag className="w-5 h-5" />
                       {isInCart ? "Added to Cart" : "Add to Cart"}
-                    </button>
-                    <button
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={handleWishlist}
-                      className={`flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium border border-border-primary hover:bg-background-secondary ${
-                        isInWishlist ? "text-error border-error" : "text-text-primary"
+                      className={`flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium text-base border transition-colors duration-200 ${
+                        isInWishlist
+                          ? "border-error text-error hover:bg-error/10"
+                          : "border-border-primary text-text-primary hover:bg-background-secondary"
                       }`}
                     >
                       <Heart
@@ -711,7 +694,7 @@ export default function ProductModal({ product: initialProduct, onClose, keyword
                       <span className="hidden sm:inline">
                         {isInWishlist ? "Remove from Wishlist" : "Add to Wishlist"}
                       </span>
-                    </button>
+                    </motion.button>
                   </div>
                 </div>
               </div>
