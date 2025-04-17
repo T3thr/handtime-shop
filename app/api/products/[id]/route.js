@@ -1,6 +1,6 @@
-// app/api/products/[id]/route.js
 import Product from "@/backend/models/Product";
 import dbConnect from "@/backend/lib/mongodb";
+import { NextResponse } from 'next/server';
 
 export async function GET(request, { params }) {
   await dbConnect();
@@ -8,19 +8,13 @@ export async function GET(request, { params }) {
 
   // Add validation for the ID
   if (!id || id === 'undefined') {
-    return new Response(JSON.stringify({ message: "Invalid product ID" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return NextResponse.json({ message: "Invalid product ID" }, { status: 400 });
   }
 
   try {
     const product = await Product.findById(id).lean();
     if (!product) {
-      return new Response(JSON.stringify({ message: "Product not found" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
-      });
+      return NextResponse.json({ message: "Product not found" }, { status: 404 });
     }
 
     // Ensure numeric fields are plain numbers, not MongoDB BSON objects
@@ -35,15 +29,13 @@ export async function GET(request, { params }) {
       compareAtPrice: product.compareAtPrice ? Number(product.compareAtPrice) : null,
     };
 
-    return new Response(JSON.stringify(serializedProduct), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
+    return NextResponse.json(serializedProduct, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0', // Prevent caching
+      },
     });
   } catch (error) {
     console.error("Error fetching product:", error);
-    return new Response(JSON.stringify({ message: "Server error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return NextResponse.json({ message: "Server error" }, { status: 500 });
   }
 }

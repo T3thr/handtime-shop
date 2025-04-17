@@ -112,7 +112,6 @@ export default function Product() {
       const product = products?.find((p) => p._id === id);
       if (product) {
         setSelectedProduct({ ...product, keyword });
-        // Update URL to product slug
         window.history.pushState({}, '', `/product/${product.slug}`);
       }
     };
@@ -123,7 +122,6 @@ export default function Product() {
       setHighlightedSection({ section, keyword });
     };
 
-    // Handle browser back/forward navigation
     const handlePopState = () => {
       if (!window.location.pathname.startsWith('/product/')) {
         setSelectedProduct(null);
@@ -134,12 +132,19 @@ export default function Product() {
     document.addEventListener("openLearnMoreModal", handleOpenLearnMoreModal);
     window.addEventListener('popstate', handlePopState);
 
+    // Listen for product updates (e.g., from admin actions)
+    const handleProductUpdate = () => {
+      refetchProducts(); // Trigger SWR revalidation
+    };
+    document.addEventListener("productUpdated", handleProductUpdate);
+
     return () => {
       document.removeEventListener("openProductModal", handleOpenProductModal);
       document.removeEventListener("openLearnMoreModal", handleOpenLearnMoreModal);
+      document.removeEventListener("productUpdated", handleProductUpdate);
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [products]);
+  }, [products, refetchProducts]);
 
   const scrollToFeaturedProducts = () => {
     if (featuredProductsRef.current) {
@@ -272,7 +277,6 @@ export default function Product() {
       reviewCount: reviewData.reviewCount,
       reviews: reviewData.reviews
     });
-    // Update URL to product slug
     window.history.pushState({}, '', `/product/${product.slug}`);
   };
 

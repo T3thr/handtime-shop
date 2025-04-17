@@ -8,7 +8,12 @@ export async function GET() {
     const products = await Product.find({ status: 'active' })
       .select('name slug description price images categories averageRating reviewCount quantity continueSellingWhenOutOfStock')
       .lean();
-    return NextResponse.json(products);
+
+    return NextResponse.json(products, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0', // Prevent caching
+      },
+    });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 });
   }
